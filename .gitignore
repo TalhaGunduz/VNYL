@@ -1,0 +1,21 @@
+# React / frontend
+vynl-frontend/node_modules/
+
+# Laravel / backend
+vynl-backend/vendor/
+vynl-backend/.env
+vynl-backend/storage/
+vynl-backend/bootstrap/cache/
+
+# Sistem dosyaları
+.DS_Store
+
+# Log dosyaları
+*.log
+
+# IDE / editör dosyaları (varsa)
+.vscode/
+.idea/
+
+
+
