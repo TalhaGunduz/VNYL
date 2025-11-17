@@ -1,17 +1,3 @@
-# Laravel backend
-vynl-backend/vendor/
-vynl-backend/node_modules/
-vynl-backend/.env
-
-# React frontend
-vynl-frontend/node_modules/
-vynl-frontend/dist/
-vynl-frontend/build/
-vynl-frontend/.env
-
-# Genel
-.DS_Store
-
 *.log
 .DS_Store
 .env
@@ -36,9 +22,4 @@ vynl-frontend/.env
 Homestead.json
 Homestead.yaml
 Thumbs.db
-
-
-
-git commit -m "Add .gitignore and initial commit for backend and frontend"
-
 

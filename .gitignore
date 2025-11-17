@@ -1,21 +1,17 @@
-# React / frontend
-vynl-frontend/node_modules/
-
-# Laravel / backend
-vynl-backend/vendor/
-vynl-backend/.env
-vynl-backend/storage/
-vynl-backend/bootstrap/cache/
-
-# Sistem dosyaları
+# İşletim sistemi dosyaları
 .DS_Store
+Thumbs.db
 
-# Log dosyaları
-*.log
+# Laravel (Backend)
+/vynl-backend/vendor/
+/vynl-backend/.env
+/vynl-backend/storage/framework/sessions/*
+/vynl-backend/storage/framework/views/*
+/vynl-backend/storage/framework/cache/data/*
+/vynl-backend/storage/logs/*.log
 
-# IDE / editör dosyaları (varsa)
-.vscode/
-.idea/
-
-
-
+# React (Frontend)
+/vynl-frontend/node_modules/
+/vynl-frontend/.env
+/vynl-frontend/build/
+/vynl-frontend/.DS_Store
