@@ -8,3 +8,5 @@ Route::middleware('api')->prefix('api')->group(function () {
         return ['message' => 'API çalışıyor!'];
     });
 });
+
+ss
