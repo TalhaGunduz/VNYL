@@ -33,29 +33,107 @@ const EditProfile = () => {
     }, [navigate]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        let value = e.target.value;
+
+        // Username constraints
+        if (e.target.name === 'username') {
+            value = value.toLowerCase()
+                .replace(/\s+/g, '') // Remove spaces
+                .replace(/[^a-z0-9_.]/g, ''); // Allow only a-z, 0-9, _, .
+        }
+
+        setFormData({ ...formData, [e.target.name]: value });
+    };
+
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [avatarPreview, setAvatarPreview] = useState('');
+
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setAvatarFile(file);
+            setAvatarPreview(URL.createObjectURL(file));
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Update local storage
-        const updatedUser = { ...user, ...formData };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        window.dispatchEvent(new Event('storage')); // Notify other components
+        const data = new FormData();
+        data.append('name', formData.name);
+        data.append('username', formData.username);
+        data.append('location', formData.location);
+        data.append('bio', formData.bio);
+        // data.append('website', formData.website); // If website field exists
 
-        // In a real app, you would also send a PUT request to the backend here
-        // await fetch('/api/user', { method: 'PUT', body: JSON.stringify(formData) ... });
+        if (avatarFile) {
+            data.append('avatar', avatarFile);
+        }
 
-        Swal.fire({
-            icon: 'success',
-            title: 'Profile Updated',
-            text: 'Your changes have been saved successfully.',
-            timer: 1500,
-            showConfirmButton: false
-        }).then(() => {
-            navigate('/profile');
-        });
+        // LARAVEL PUT TRICK
+        data.append('_method', 'PUT');
+
+        try {
+            // Retrieve token if stored (assuming localStorage or Context)
+            const token = localStorage.getItem('token');
+
+            const headers: HeadersInit = {
+                'Accept': 'application/json', // Force JSON response from Laravel
+            };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            // Note: Content-Type header for FormData is usually handled automatically by fetch to set boundary correctly.
+            // Do NOT manually set Content-Type to multipart/form-data here.
+
+            // Using /api/artist/profile as agreed for artist updates, or generic /api/update-profile as per user snippet
+            // Let's use /api/update-profile to match user snippet exactly.
+            const response = await fetch('http://127.0.0.1:8000/api/update-profile', {
+                method: 'POST', // Important: POST for FormData
+                headers: headers,
+                credentials: 'include', // Important for Sanctum/Cookies
+                body: data
+            });
+
+            if (response.ok) {
+                const responseData = await response.json();
+
+                // Update local storage with response data (source of truth)
+                const updatedUser = { ...user, ...formData, ...responseData.user }; // Merge response
+                if (avatarPreview) updatedUser.avatar = responseData.user.avatar || avatarPreview; // Optimistic update or use response url
+
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+                window.dispatchEvent(new Event('storage'));
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Profile Updated',
+                    text: 'Your changes have been saved successfully.',
+                    timer: 1500,
+                    showConfirmButton: false
+                }).then(() => {
+                    navigate('/profile');
+                });
+            } else {
+                let errorMessage = 'Failed to update profile';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorData.error || JSON.stringify(errorData);
+                } catch (e) {
+                    errorMessage = response.statusText;
+                }
+                throw new Error(errorMessage);
+            }
+        } catch (error: any) {
+            console.error("Update failed", error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Update Failed',
+                text: error.message || 'Could not update profile. Please try again.',
+                background: '#1a1a1a',
+                color: '#fff'
+            });
+        }
     };
 
     if (!user) return null;
@@ -78,19 +156,24 @@ const EditProfile = () => {
                 <div className="bg-[#1a1a1a]/60 border border-white/5 rounded-2xl p-8 backdrop-blur-xl">
                     <form onSubmit={handleSubmit} className="space-y-6">
 
-                        {/* Avatar Section (Read-only for now) */}
+                        {/* Avatar Section */}
                         <div className="flex flex-col items-center mb-8">
-                            <div className="relative group cursor-pointer">
+                            <div className="relative group cursor-pointer w-24 h-24">
                                 <img
-                                    src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
+                                    src={avatarPreview || user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
                                     alt="Profile"
-                                    className="w-24 h-24 rounded-full border-4 border-white/10 object-cover"
+                                    className="w-full h-full rounded-full border-4 border-white/10 object-cover"
                                 />
                                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                                     <span className="text-xs font-medium">Change</span>
                                 </div>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleAvatarChange}
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                />
                             </div>
-                            <p className="text-xs text-white/40 mt-2">Avatar changing coming soon</p>
                         </div>
 
                         {/* Name */}

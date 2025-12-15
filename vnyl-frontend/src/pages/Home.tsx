@@ -185,6 +185,11 @@ export default function Home() {
       // setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
 
+      // Also save token separately for easy access in EditProfile
+      if (params.get('token')) {
+        localStorage.setItem('token', params.get('token')!);
+      }
+
       // Trigger a storage event so Navbar can update immediately if it listens
       window.dispatchEvent(new Event('storage'));
 

@@ -7,12 +7,17 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
-Route::put('/update-profile', [AuthController::class, 'updateProfile']);
-Route::delete('/delete-account', [AuthController::class, 'deleteAccount']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::match(['put', 'post'], '/update-profile', [AuthController::class, 'updateProfile']);
+    Route::delete('/delete-account', [AuthController::class, 'deleteAccount']);
+});
+
 // Artist Flow
 Route::post('/auth/send-verification', [\App\Http\Controllers\ArtistController::class, 'sendVerification']);
 Route::post('/auth/verify-code', [\App\Http\Controllers\ArtistController::class, 'verifyCode']);
 Route::post('/artist/verify-and-upgrade', [\App\Http\Controllers\ArtistController::class, 'verifyAndUpgrade']);
+Route::match(['put', 'post'], '/artist/profile', [\App\Http\Controllers\ArtistController::class, 'updateProfile'])->middleware('auth:sanctum');
 Route::get('/artist/stats', [\App\Http\Controllers\ArtistController::class, 'getStats']);
 
 Route::middleware(['web'])->group(function () {
