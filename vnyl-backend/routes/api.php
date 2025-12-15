@@ -9,6 +9,9 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/user', function (Request $request) {
+        return $request->user()->load('artist');
+    });
     Route::match(['put', 'post'], '/update-profile', [AuthController::class, 'updateProfile']);
     Route::delete('/delete-account', [AuthController::class, 'deleteAccount']);
 });

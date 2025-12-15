@@ -9,7 +9,7 @@ import {
     ShieldCheck,
     LayoutDashboard,
     ChevronDown,
-    BadgeCheck
+    BadgeCheck // Changed from Check
 } from 'lucide-react';
 import VerificationModal from './VerificationModal';
 
@@ -74,8 +74,8 @@ const ProfileMenu = () => {
                         className="w-9 h-9 rounded-full object-cover border-2 border-transparent group-hover:border-white/20 transition-all"
                     />
                     {isVerified && (
-                        <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-[2px] border-2 border-bg">
-                            <BadgeCheck size={10} className="text-white" fill="currentColor" />
+                        <div className="absolute -bottom-1 -right-1 bg-[var(--bg)] rounded-full border-[2px] border-[var(--bg)] flex items-center justify-center">
+                            <BadgeCheck size={18} className="text-white fill-blue-500" />
                         </div>
                     )}
                 </div>

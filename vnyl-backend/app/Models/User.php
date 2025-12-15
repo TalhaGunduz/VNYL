@@ -83,7 +83,7 @@ class User extends Authenticatable
      *
      * @var array
      */
-    protected $appends = ['joined_at'];
+    protected $appends = ['joined_at', 'is_artist', 'is_verified'];
 
     /**
      * Get the user's joined date in a human readable format.
@@ -91,5 +91,21 @@ class User extends Authenticatable
     public function getJoinedAtAttribute(): string
     {
         return $this->created_at ? $this->created_at->format('F Y') : 'N/A';
+    }
+
+    /**
+     * Determine if the user is an artist.
+     */
+    public function getIsArtistAttribute(): bool
+    {
+        return $this->role === 'artist';
+    }
+
+    /**
+     * Determine if the user is verified.
+     */
+    public function getIsVerifiedAttribute(): bool
+    {
+        return $this->verification_status === 'verified';
     }
 }

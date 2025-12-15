@@ -165,32 +165,78 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const loginSuccess = params.get('login_success');
+    const token = params.get('token');
     const error = params.get('error');
 
-    if (loginSuccess === 'true') {
-      // Debug: Log all params to see what backend is sending
-      console.log('Google Callback Params:', Object.fromEntries(params.entries()));
+    // Debug: Log complete return URL
+    if (loginSuccess || error) {
+      console.log('Google Auth Return:', {
+        loginSuccess,
+        token: token ? 'Present' : 'Missing',
+        error,
+        allParams: Object.fromEntries(params.entries())
+      });
+    }
 
+    if (loginSuccess === 'true') {
+      // 1. Try to use Token + API (Best for nested data)
+      if (token) {
+        localStorage.setItem('token', token);
+
+        fetch('http://127.0.0.1:8000/api/user', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        })
+          .then(res => {
+            if (!res.ok) throw new Error('Failed to fetch user data');
+            return res.json();
+          })
+          .then(userData => {
+            console.log('Fetched User Data via API:', userData);
+            finalizeLogin(userData);
+          })
+          .catch(err => {
+            console.error('API Fetch failed, falling back to URL params:', err);
+            fallbackToUrlParams(params);
+          });
+      } else {
+        // 2. Fallback to URL Params (If no token provided)
+        console.warn('No token found, using URL parameters.');
+        fallbackToUrlParams(params);
+      }
+    } else if (error) {
+      Swal.fire({
+        title: 'Hata!',
+        text: 'Google girişi başarısız oldu.',
+        icon: 'error',
+        confirmButtonText: 'Tamam'
+      });
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    function fallbackToUrlParams(params: URLSearchParams) {
       const userData = {
-        name: params.get('name') || params.get('username') || 'User', // Restore name for Profile.tsx
+        name: params.get('name') || params.get('username') || 'User',
         username: params.get('username'),
         avatar: params.get('avatar'),
-        email: params.get('email'),        // <--- YENİ MİSAFİR 1
-        joinedAt: params.get('joined_at'), // <--- YENİ MİSAFİR 2
+        email: params.get('email'),
+        joinedAt: params.get('joined_at'),
         dob: params.get('dob'),
-        location: params.get('location')   // <--- YENİ MİSAFİR 3 (Hybrid Update)
+        location: params.get('location'),
+        // Try to parse basic artist info if flattened in URL
+        artist: params.get('artist_stage_name') ? {
+          stage_name: params.get('artist_stage_name'),
+          bio: params.get('artist_bio')
+        } : undefined
       };
+      console.log('Constructed User Data from URL:', userData);
+      finalizeLogin(userData);
+    }
 
-      // State'e kaydet (Home'da setUser yok, sadece localStorage yeterli)
-      // setUser(userData);
+    function finalizeLogin(userData: any) {
       localStorage.setItem('user', JSON.stringify(userData));
-
-      // Also save token separately for easy access in EditProfile
-      if (params.get('token')) {
-        localStorage.setItem('token', params.get('token')!);
-      }
-
-      // Trigger a storage event so Navbar can update immediately if it listens
       window.dispatchEvent(new Event('storage'));
 
       Swal.fire({
@@ -199,15 +245,7 @@ export default function Home() {
         timer: 2000,
         showConfirmButton: false
       });
-      // Temizle
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (error) {
-      Swal.fire({
-        title: 'Hata!',
-        text: 'Google girişi başarısız oldu.',
-        icon: 'error',
-        confirmButtonText: 'Tamam'
-      });
+
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);

@@ -11,6 +11,7 @@ class Artist extends Model
 
     protected $fillable = [
         'user_id',
+        'avatar',
         'is_verified',
         'stage_name',
         'artist_bio',

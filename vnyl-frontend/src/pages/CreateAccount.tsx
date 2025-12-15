@@ -72,6 +72,9 @@ const CreateAccount = () => {
           location: data.user?.location || data.location || formData.location
         };
         localStorage.setItem('user', JSON.stringify(userToSave));
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+        }
         window.dispatchEvent(new Event('storage'));
 
         Swal.fire({

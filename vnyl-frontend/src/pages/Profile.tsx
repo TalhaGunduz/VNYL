@@ -44,10 +44,12 @@ const Profile = () => {
 
         if (result.isConfirmed) {
             try {
+                const token = localStorage.getItem('token');
                 const response = await fetch('http://127.0.0.1:8000/api/delete-account', {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({ email: user.email })
                 });
@@ -99,7 +101,12 @@ const Profile = () => {
                         <img
                             src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
                             alt={user.name}
-                            className="relative w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-[#121212] shadow-2xl"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.onerror = null; // Prevent infinite loop
+                                target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`;
+                            }}
+                            className="relative w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-[#121212] shadow-2xl bg-[#121212]"
                         />
                         {/* Status Indicator (Mock) */}
                         <div className="absolute bottom-2 right-2 w-6 h-6 bg-[var(--accent)] rounded-full border-4 border-[#121212] z-20" title="Online" />

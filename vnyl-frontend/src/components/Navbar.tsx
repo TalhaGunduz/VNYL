@@ -42,7 +42,7 @@ const Navbar = () => {
           </Link>
           {user && (
             <Link className="text-white/60 hover:text-white transition-colors flex items-center gap-2" to="/profile">
-              <User size={16} /> <span className="hidden md:inline">Profile</span>
+              <User size={16} /> <span className="hidden lg:inline">Profile</span>
             </Link>
           )}
         </nav>

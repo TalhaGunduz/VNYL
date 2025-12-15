@@ -44,6 +44,9 @@ const Login = () => {
           avatar: data.user?.avatar || null
         };
         localStorage.setItem('user', JSON.stringify(userToSave));
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+        }
         window.dispatchEvent(new Event('storage'));
 
         Swal.fire({

@@ -83,37 +83,22 @@ class AuthController extends Controller
             ->redirect();
     }
 
-    public function handleGoogleCallback()
+    public function handleGoogleCallback(Request $request)
     {
         try {
             $googleUser = \Laravel\Socialite\Facades\Socialite::driver('google')->user();
-
             $user = User::where('email', $googleUser->getEmail())->first();
 
             // Try to get location from locale
             $rawUser = $googleUser->user;
             $locale = isset($rawUser['locale']) ? $rawUser['locale'] : 'en';
 
-            // Map common locales to Countries
             $locationMap = [
-                'tr' => 'Turkey',
-                'en' => 'USA',
-                'en-US' => 'USA',
-                'en-GB' => 'United Kingdom',
-                'fr' => 'France',
-                'de' => 'Germany',
-                'hi' => 'India',
-                'in' => 'India',
-                'es' => 'Spain',
-                'it' => 'Italy',
-                'jp' => 'Japan',
-                'ja' => 'Japan',
-                'ru' => 'Russia',
-                'pt' => 'Portugal',
-                'br' => 'Brazil',
-                'pt-BR' => 'Brazil',
+                'tr' => 'Turkey', 'en' => 'USA', 'en-US' => 'USA', 'en-GB' => 'United Kingdom',
+                'fr' => 'France', 'de' => 'Germany', 'hi' => 'India', 'in' => 'India',
+                'es' => 'Spain', 'it' => 'Italy', 'jp' => 'Japan', 'ja' => 'Japan',
+                'ru' => 'Russia', 'pt' => 'Portugal', 'br' => 'Brazil', 'pt-BR' => 'Brazil',
             ];
-
             $location = isset($locationMap[$locale]) ? $locationMap[$locale] : strtoupper($locale);
 
             if (!$user) {
@@ -135,13 +120,36 @@ class AuthController extends Controller
                 ];
                 
                 if (empty($user->location) && $location) $dataToUpdate['location'] = $location;
-                if (empty($user->name)) $dataToUpdate['name'] = $googleUser->getName();
+                
+                // Fix for unique name collision
+                if (empty($user->name)) {
+                    $googleName = $googleUser->getName();
+                    $newName = $googleName;
+                    $counter = 1;
+
+                    // Check if name exists for ANY other user
+                    while (User::where('name', $newName)->where('id', '!=', $user->id)->exists()) {
+                        $newName = $googleName . ' ' . $counter;
+                        $counter++;
+                    }
+                    $dataToUpdate['name'] = $newName;
+                } else {
+                    // Update name if current name is just a placeholder or if we want to sync (Optional: usually better to keep user's chosen name if not empty)
+                    // But if we MUST update it:
+                    if (!isset($dataToUpdate['name']) && $request->has('force_update_name')) { 
+                         // Logic if needed, for now we only update if empty as per original logic, 
+                         // but with uniqueness check above.
+                    }
+                }
 
                 $user->update($dataToUpdate);
             }
 
             // Create Token for Google Login
             $token = $user->createToken('auth_token')->plainTextToken;
+            
+            // Safely get artist relationship
+            $artist = $user->artist;
 
             // Redirect with user details (Login Success) AND Token
             $redirectUrl = "http://localhost:5173?login_success=true" .
@@ -153,12 +161,24 @@ class AuthController extends Controller
                 "&dob=" . urlencode($user->dob ?? '') .
                 "&location=" . urlencode($user->location ?? '') .
                 "&role=" . urlencode($user->role ?? 'user') .
-                "&token=" . urlencode($token); // <-- ADDED TOKEN
+                "&is_artist=" . ($user->is_artist ? 'true' : 'false') .
+                "&is_verified=" . ($user->is_verified ? 'true' : 'false') .
+                "&isArtist=" . ($user->is_artist ? 'true' : 'false') .
+                "&isVerified=" . ($user->is_verified ? 'true' : 'false') .
+                "&id=" . urlencode($user->id) .
+                "&verification_status=" . urlencode($user->verification_status ?? 'unverified') .
+                // Fallback priority: Artist Relation > User Attribute > Empty
+                "&stage_name=" . urlencode($artist->stage_name ?? $user->stage_name ?? '') .
+                "&artist_bio=" . urlencode($artist->artist_bio ?? $artist->bio ?? $user->artist_bio ?? '') .
+                "&primary_genre=" . urlencode($artist->primary_genre ?? $user->primary_genre ?? '') .
+                "&career_status=" . urlencode($artist->career_status ?? $user->career_status ?? '') .
+                "&token=" . urlencode($token);
             
             return redirect($redirectUrl);
 
         } catch (\Exception $e) {
-            return redirect("http://localhost:5173?error=google_login_failed");
+            \Illuminate\Support\Facades\Log::error('Google Login Error: ' . $e->getMessage());
+            return redirect("http://localhost:5173?error=google_login_failed&message=" . urlencode($e->getMessage()));
         }
     }
 
