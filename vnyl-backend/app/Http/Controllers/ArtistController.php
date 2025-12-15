@@ -33,7 +33,7 @@ class ArtistController extends Controller
             'verification_code_expires_at' => Carbon::now()->addMinutes(10)
         ]);
 
-        // Mock Mail
+        // Mock Mail - Log for debug
         Log::info(" ====== MOCK EMAIL SERVICE ======");
         Log::info(" SENDING VERIFICATION TO: " . $user->email);
         Log::info(" VERIFICATION CODE: " . $code);
@@ -77,24 +77,24 @@ class ArtistController extends Controller
     // B. Verify & Upgrade User (Final Step)
     public function verifyAndUpgrade(Request $request)
     {
-        // 1. Validasyon
+        // 1. Validation
         $validated = $request->validate([
             'email' => 'required|email|exists:users,email',
             'code' => 'required|string', 
-            'stage_name' => 'required|string|max:255|unique:users,stage_name', 
+            'stage_name' => 'required|string|max:255|unique:artists,stage_name', // Unique in artists table usually
             'primary_genre' => 'required|string',
             'secondary_genres' => 'array', 
             'bio' => 'required|string|min:100',
             'career_status' => 'required|string',
             'location_city' => 'nullable|string',
             'location_country' => 'nullable|string',
-            'avatar' => 'nullable', // Dosya veya URL olabilir
-            'socials' => 'nullable|array' // Frontend 'socials' objesi yolluyor
+            'avatar' => 'nullable', 
+            'socials' => 'nullable|array' 
         ]);
 
         $user = User::where('email', $request->email)->first();
 
-        // 2. Kod Kontrolü
+        // 2. Code Check
         if ($user->verification_code !== $request->code) {
             return response()->json(['message' => 'Invalid verification code'], 400);
         }
@@ -104,48 +104,69 @@ class ArtistController extends Controller
         }
 
         // 3. Avatar Upload
+        $avatarUrl = null;
         if ($request->hasFile('avatar')) {
             $path = $request->file('avatar')->store('avatars', 'public');
-            $user->avatar = url('storage/' . $path);
+            $avatarUrl = url('storage/' . $path);
         } 
         elseif ($request->avatar && str_starts_with($request->avatar, 'data:image')) {
             $image = $request->avatar;
             $image = str_replace(['data:image/png;base64,', 'data:image/jpeg;base64,', ' '], ['', '', '+'], $image);
             $imageName = 'avatar_' . $user->id . '_' . time() . '.png';
-            
             \Illuminate\Support\Facades\Storage::disk('public')->put('avatars/' . $imageName, base64_decode($image));
-            $user->avatar = url('storage/avatars/' . $imageName);
+            $avatarUrl = url('storage/avatars/' . $imageName);
         }
-
-        // 4. Update Data
-        $user->stage_name = $request->stage_name;
-        $user->artist_bio = $request->bio;
-        $user->primary_genre = $request->primary_genre;
-        $user->secondary_genres = $request->secondary_genres;
-        $user->career_status = $request->career_status;
-        $user->location_city = $request->location_city;
-        $user->location_country = $request->location_country;
         
-        // Handle Socials
-        if ($request->has('socials')) {
-            $socials = $request->input('socials');
-            $user->social_instagram = $socials['instagram'] ?? null;
-            $user->social_spotify = $socials['spotify'] ?? null;
-            $user->social_youtube = $socials['youtube'] ?? null;
-            $user->social_soundcloud = $socials['soundcloud'] ?? null;
-            $user->social_apple = $socials['apple'] ?? null;
+        // Also update user avatar if present
+        if ($avatarUrl) {
+            $user->avatar = $avatarUrl;
         }
 
-        // 5. Status Update
+        // 4. Update User Role
         $user->role = 'artist';
         $user->verification_status = 'verified';
         $user->verification_code = null;
         $user->verification_code_expires_at = null;
-
+        
+        // Sync basic info to user table as well for easier access if needed
+        $user->stage_name = $request->stage_name; 
+        $user->artist_bio = $request->bio;
+        
         $user->save();
 
-        // Optional: Keep Artist table for ID reference
-        Artist::firstOrCreate(['user_id' => $user->id], ['is_verified' => true]);
+        // 5. Create/Update Artist Record
+        $artistData = [
+            'user_id' => $user->id,
+            'stage_name' => $request->stage_name,
+            'artist_bio' => $request->bio,     // new field
+            'bio' => $request->bio,            // legacy field
+            'primary_genre' => $request->primary_genre,
+            'secondary_genres' => $request->secondary_genres,
+            'career_status' => $request->career_status,
+            'location_city' => $request->location_city,
+            'location_country' => $request->location_country,
+            'avatar' => $avatarUrl, // Save avatar to artist table too
+            'is_verified' => true
+        ];
+
+        // Handle Socials
+        if ($request->has('socials')) {
+            $socials = $request->input('socials');
+            $artistData['social_instagram'] = $socials['instagram'] ?? null;
+            $artistData['social_spotify'] = $socials['spotify'] ?? null;
+            $artistData['social_youtube'] = $socials['youtube'] ?? null;
+            $artistData['social_soundcloud'] = $socials['soundcloud'] ?? null;
+            $artistData['social_apple'] = $socials['apple'] ?? null;
+            
+            // Legacy / Duplicate for safety if frontend reads from one or other
+            $artistData['instagram_handle'] = $socials['instagram'] ?? null;
+            $artistData['spotify_id'] = $socials['spotify'] ?? null;
+        }
+
+        $artist = Artist::updateOrCreate(
+            ['user_id' => $user->id],
+            $artistData
+        );
 
         return response()->json([
             'message' => 'Artist profile created successfully',
@@ -156,14 +177,15 @@ class ArtistController extends Controller
     // 6. Edit Profile Endpoint (PUT /api/artist/profile)
     public function updateProfile(Request $request)
     {
-        $user = auth()->user(); // Get authenticated user
+        $user = auth()->user(); 
         
         if (!$user) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        $validated = $request->validate([
-            'stage_name' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
+        // Validate
+        $request->validate([
+            'stage_name' => 'required|string|max:255',
             'primary_genre' => 'required|string',
             'secondary_genres' => 'array',
             'bio' => 'required|string|min:100',
@@ -174,38 +196,64 @@ class ArtistController extends Controller
         ]);
 
         // Handle Avatar
+        $avatarUrl = null;
         if ($request->hasFile('avatar')) {
             $path = $request->file('avatar')->store('avatars', 'public');
-            $user->avatar = url('storage/' . $path);
+            $avatarUrl = url('storage/' . $path);
         } elseif ($request->avatar && str_starts_with($request->avatar, 'data:image')) {
             $image = $request->avatar;
             $image = str_replace(['data:image/png;base64,', 'data:image/jpeg;base64,', ' '], ['', '', '+'], $image);
             $imageName = 'avatar_' . $user->id . '_' . time() . '.png';
             \Illuminate\Support\Facades\Storage::disk('public')->put('avatars/' . $imageName, base64_decode($image));
-            $user->avatar = url('storage/avatars/' . $imageName);
+            $avatarUrl = url('storage/avatars/' . $imageName);
         }
 
-        $user->stage_name = $request->stage_name;
-        $user->artist_bio = $request->bio;
-        $user->primary_genre = $request->primary_genre;
-        $user->secondary_genres = $request->secondary_genres;
-        $user->location_city = $request->location_city;
-        $user->location_country = $request->location_country;
-
-        // Update Socials
-        if ($request->has('socials')) {
-            $socials = $request->input('socials');
-            // Use ?? $user->social_... to keep existing if not sent
-            $user->social_instagram = $socials['instagram'] ?? $user->social_instagram;
-            $user->social_spotify = $socials['spotify'] ?? $user->social_spotify;
-            $user->social_youtube = $socials['youtube'] ?? $user->social_youtube;
-            $user->social_soundcloud = $socials['soundcloud'] ?? $user->social_soundcloud;
-            $user->social_apple = $socials['apple'] ?? $user->social_apple;
-        }
-
+        // Update User table basics
+        if ($request->has('stage_name')) $user->stage_name = $request->stage_name;
+        if ($request->has('bio')) $user->artist_bio = $request->bio;
+        if ($avatarUrl) $user->avatar = $avatarUrl;
+        
         $user->save();
 
-        return response()->json(['message' => 'Profile updated', 'user' => $user], 200);
+        // Update Artist Table
+        $artistData = [
+            'stage_name' => $request->stage_name,
+            'artist_bio' => $request->bio,
+            'bio' => $request->bio,
+            'primary_genre' => $request->primary_genre,
+            'secondary_genres' => $request->secondary_genres,
+            'location_city' => $request->location_city,
+            'location_country' => $request->location_country,
+        ];
+
+        if ($avatarUrl) {
+            $artistData['avatar'] = $avatarUrl;
+        }
+
+        // Socials
+        if ($request->has('socials')) {
+            $socials = $request->input('socials');
+            // Merge with existing socials if partial update, or overwrite. 
+            // Usually update profile sends all form data, so we can overwrite or use null coalesce with existing artist
+            
+            $currentArtist = $user->artist;
+            
+            $artistData['social_instagram'] = $socials['instagram'] ?? $currentArtist?->social_instagram;
+            $artistData['social_spotify'] = $socials['spotify'] ?? $currentArtist?->social_spotify;
+            $artistData['social_youtube'] = $socials['youtube'] ?? $currentArtist?->social_youtube;
+            $artistData['social_soundcloud'] = $socials['soundcloud'] ?? $currentArtist?->social_soundcloud;
+            $artistData['social_apple'] = $socials['apple'] ?? $currentArtist?->social_apple;
+            
+            $artistData['instagram_handle'] = $socials['instagram'] ?? $currentArtist?->instagram_handle;
+            $artistData['spotify_id'] = $socials['spotify'] ?? $currentArtist?->spotify_id;
+        }
+
+        $artist = Artist::updateOrCreate(
+            ['user_id' => $user->id],
+            $artistData
+        );
+
+        return response()->json(['message' => 'Profile updated', 'user' => $user->load('artist')], 200);
     }
 
     // C. Get Artist Statistics (Mock)

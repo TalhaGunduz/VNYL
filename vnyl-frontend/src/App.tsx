@@ -9,6 +9,7 @@ import EditProfile from './pages/EditProfile';
 import Upload from './pages/Upload';
 import BecomeArtist from './pages/BecomeArtist'; // Added import for BecomeArtist
 import ArtistPanel from './pages/ArtistPanel';
+import ArtistProfileSetup from './pages/ArtistProfileSetup';
 
 export default function App() {
   return (
@@ -22,8 +23,9 @@ export default function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/edit-profile" element={<EditProfile />} />
         <Route path="/upload" element={<Upload />} />
-        <Route path="/become-artist" element={<BecomeArtist />} /> {/* Added BecomeArtist route */}
+        <Route path="/become-artist" element={<BecomeArtist />} />
         <Route path="/artist-panel" element={<ArtistPanel />} />
+        <Route path="/artist/complete-profile" element={<ArtistProfileSetup />} />
       </Routes>
     </Router>
   );

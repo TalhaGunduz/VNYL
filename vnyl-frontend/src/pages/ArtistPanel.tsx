@@ -11,15 +11,18 @@ import {
     ShieldCheck,
     AlertCircle,
     BadgeCheck,
-    Settings
+    Settings,
+    Edit3
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import VerificationModal from '../components/VerificationModal';
+// import ArtistProfileModal from '../components/ArtistProfileModal'; // Removed
 
 const ArtistPanel = () => {
     const navigate = useNavigate();
     const [user, setUser] = useState<any>(null);
     const [isVerificationOpen, setIsVerificationOpen] = useState(false);
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
     useEffect(() => {
         const loadUser = () => {
@@ -27,10 +30,7 @@ const ArtistPanel = () => {
             if (stored) {
                 try {
                     const parsedUser = JSON.parse(stored);
-                    // Simple protection: redirect if not artist
                     if (parsedUser.role !== 'artist') {
-                        // navigate('/profile'); // Commented out for testing/demo purposes
-                        // return;
                         console.warn("Accessing Artist Panel as non-artist (Dev Mode)");
                     }
                     setUser(parsedUser);
@@ -85,6 +85,41 @@ const ArtistPanel = () => {
     const isVerified = user.verification_status === 'verified';
     const isPending = user.verification_status === 'pending';
 
+    // Calculate detailed completion percentage
+    const calculateCompletion = () => {
+        const fields = [
+            { key: 'avatar', label: 'Profile Picture' },
+            { key: 'stage_name', label: 'Stage Name' },
+            { key: 'artist_bio', label: 'Bio' }, // mapped to bio in setup
+            { key: 'location_city', label: 'City' },
+            { key: 'primary_genre', label: 'Primary Genre' },
+            { key: 'social_instagram', label: 'Instagram' }
+        ];
+
+        const filled = fields.filter(f => {
+            // Check both root user object and nested artist object
+            // Also handle mapped keys like artist_bio vs bio
+            let val = user[f.key] || user.artist?.[f.key];
+
+            // Special case for bio which might be artist_bio or bio
+            if (f.key === 'artist_bio') {
+                val = user.artist_bio || user.artist?.artist_bio || user.artist?.bio || user.bio;
+            }
+
+            // Special case for stage_name
+            if (f.key === 'stage_name') {
+                val = user.stage_name || user.artist?.stage_name || user.name;
+            }
+
+            return val && val.length > 0;
+        });
+
+        return Math.round((filled.length / fields.length) * 100);
+    };
+
+    const completionPercent = calculateCompletion();
+
+
     // Mock Uploads
     const uploads = [
         { id: 1, title: 'Midnight City', plays: '42,102', date: '2 days ago', image: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=800&auto=format&fit=crop&q=60' },
@@ -107,14 +142,14 @@ const ArtistPanel = () => {
                             />
                         </div>
                         {isVerified && (
-                            <div className="absolute bottom-0 right-0 bg-blue-500 text-white p-1.5 rounded-full border-4 border-[var(--bg)] shadow-lg" title="Verified Artist">
-                                <BadgeCheck size={20} />
+                            <div className="absolute -bottom-1 -right-1 bg-[var(--bg)] rounded-full border-[2px] border-[var(--bg)] flex items-center justify-center box-content">
+                                <BadgeCheck size={24} className="text-white fill-blue-500" />
                             </div>
                         )}
                     </div>
                     <div>
                         <div className="flex items-center gap-3 mb-1">
-                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">{user.artist?.stage_name || user.name}</h1>
+                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">{user.stage_name || user.artist?.stage_name || user.name}</h1>
                             {isPending && (
                                 <span className="bg-yellow-500/20 text-yellow-500 text-xs px-2 py-0.5 rounded font-bold border border-yellow-500/20">PENDING</span>
                             )}
@@ -127,7 +162,7 @@ const ArtistPanel = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-bold transition-all">
+                    <button onClick={() => navigate('/edit-profile')} className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-bold transition-all">
                         <Settings size={18} />
                         Settings
                     </button>
@@ -138,52 +173,59 @@ const ArtistPanel = () => {
                 </div>
             </header>
 
-            {/* Verification Banner (If not verified) */}
-            {!isVerified && !isPending && (
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-10 bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-500/20 p-6 rounded-2xl flex items-center justify-between gap-6 relative overflow-hidden"
-                >
-                    <div className="relative z-10 flex items-start gap-4">
-                        <div className="p-3 bg-blue-500/20 rounded-xl text-blue-400">
-                            <ShieldCheck size={28} />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-white mb-1">Get Verified</h3>
-                            <p className="text-white/60 text-sm max-w-lg">
-                                Verified artists get improved visibility, exclusive tools, and the blue checkmark.
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={() => setIsVerificationOpen(true)}
-                        className="relative z-10 whitespace-nowrap px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-blue-900/20"
-                    >
-                        Apply Now
-                    </button>
-                    {/* Decor */}
-                    <div className="absolute top-0 right-0 w-64 h-full bg-gradient-to-l from-blue-600/10 to-transparent" />
-                </motion.div>
-            )}
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {/* 1. Stats Grid (HERO - Main Focus) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 {stats.map((stat, i) => (
-                    <div key={i} className="bg-[#18181b]/60 border border-white/5 p-6 rounded-2xl relative overflow-hidden group">
+                    <div key={i} className="bg-[#18181b] border border-white/5 p-6 rounded-3xl relative overflow-hidden group hover:bg-white/5 transition-colors">
                         <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
-                            <stat.icon className={stat.color} size={24} />
+                            <stat.icon className={stat.color} size={28} />
                         </div>
-                        <p className="text-white/40 text-sm font-medium mb-2">{stat.label}</p>
-                        <div className="flex items-end gap-3">
-                            <h2 className="text-3xl font-black text-white">{stat.value}</h2>
-                            <span className="text-green-500 text-xs font-bold mb-1.5">{stat.change}</span>
+                        <p className="text-white/40 text-sm font-medium mb-1 uppercase tracking-wider">{stat.label}</p>
+                        <div className="flex items-end gap-3 z-10 relative">
+                            <h2 className="text-4xl font-black text-white">{stat.value}</h2>
+                            <span className="text-green-500 text-sm font-bold mb-2 bg-green-500/10 px-2 py-0.5 rounded-full">{stat.change}</span>
                         </div>
+                        {/* Subtle background glow */}
+                        <div className={`absolute -bottom-10 -left-10 w-32 h-32 ${stat.color.replace('text-', 'bg-')}/10 blur-3xl rounded-full pointer-events-none`} />
                     </div>
                 ))}
             </div>
 
-            {/* Content Section */}
+
+            {/* 2. Profile Completion (Always Visible) */}
+            <div className={`mb-12 border ${completionPercent === 100 ? 'border-green-500/20 bg-green-500/5' : 'border-white/10 bg-gradient-to-r from-[#18181b] to-black'} rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden`}>
+                {/* Decorative background */}
+                <div className={`absolute top-0 right-0 w-64 h-full ${completionPercent === 100 ? 'bg-green-500/5' : 'bg-[var(--accent)]/5'} skew-x-12 pointer-events-none`} />
+
+                <div className="relative z-10 flex items-center gap-4 w-full md:max-w-xl">
+                    <div className={`w-12 h-12 rounded-full border-2 ${completionPercent === 100 ? 'border-green-500 text-green-500 bg-green-500/10' : 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'} flex items-center justify-center font-bold shrink-0`}>
+                        {completionPercent}%
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="font-bold text-white text-lg flex items-center gap-2">
+                            {completionPercent === 100 ? 'Artist Profile Active' : 'Complete your profile'}
+                            {completionPercent < 100 && <span className="text-xs bg-white/10 text-white/50 px-2 py-0.5 rounded uppercase tracking-wider">Draft</span>}
+                        </h3>
+                        <div className="w-full h-1.5 bg-white/10 rounded-full mt-2 overflow-hidden">
+                            <div className={`h-full ${completionPercent === 100 ? 'bg-green-500' : 'bg-[var(--accent)]'} rounded-full`} style={{ width: `${completionPercent}%` }} />
+                        </div>
+                        <p className="text-xs text-white/40 mt-1.5">
+                            {completionPercent === 100 ? 'Your profile is fully optimized for visibility.' : 'Add bio, genres, and socials to boost visibility.'}
+                        </p>
+                    </div>
+                </div>
+
+                <button
+                    onClick={() => navigate('/artist/complete-profile')}
+                    className="relative z-10 whitespace-nowrap px-6 py-2.5 bg-white text-black text-sm font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center gap-2 shadow-lg shadow-white/5"
+                >
+                    <Edit3 size={16} />
+                    {completionPercent === 100 ? 'Edit Details' : 'Continue Setup'}
+                </button>
+            </div>
+
+
+            {/* 3. Content Section */}
             <div className="grid lg:grid-cols-3 gap-8">
 
                 {/* Left: Recent Releases */}
@@ -227,9 +269,10 @@ const ArtistPanel = () => {
                         Insights
                     </h2>
 
-                    <div className="bg-gradient-to-br from-purple-900/10 to-transparent border border-purple-500/10 rounded-2xl p-6">
-                        <h3 className="font-bold text-white mb-2">Audience Growth</h3>
-                        <div className="h-32 flex items-end gap-2 mt-4">
+                    <div className="bg-gradient-to-br from-purple-900/10 to-transparent border border-purple-500/10 rounded-2xl p-6 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-32 bg-purple-500/5 rounded-full blur-3xl" />
+                        <h3 className="font-bold text-white mb-2 relative z-10">Audience Growth</h3>
+                        <div className="h-32 flex items-end gap-2 mt-4 relative z-10">
                             {[40, 65, 45, 80, 55, 90, 75].map((h, i) => (
                                 <div key={i} className="flex-1 bg-purple-500/20 hover:bg-purple-500 rounded-t-sm transition-all relative group" style={{ height: `${h}%` }}>
                                     <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/10">
@@ -238,23 +281,10 @@ const ArtistPanel = () => {
                                 </div>
                             ))}
                         </div>
-                        <p className="text-center text-xs text-white/30 mt-4 font-mono">LAST 7 DAYS</p>
+                        <p className="text-center text-xs text-white/30 mt-4 font-mono relative z-10">LAST 7 DAYS</p>
                     </div>
 
-                    <div className="bg-[#18181b]/60 border border-white/5 rounded-2xl p-6">
-                        <div className="flex items-start gap-3">
-                            <div className="p-2 bg-yellow-500/10 rounded-full text-yellow-500 mt-1">
-                                <AlertCircle size={16} />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-white text-sm">Finish your profile</h4>
-                                <p className="text-xs text-white/50 mt-1 leading-relaxed">
-                                    Add a bio and social links to increase your chances of getting verified.
-                                </p>
-                                <button className="text-xs font-bold text-[var(--accent)] mt-3 hover:underline">Edit Profile</button>
-                            </div>
-                        </div>
-                    </div>
+                    {/* Removed old 'Finish your profile' box since we have the hero section now */}
 
                 </div>
             </div>
@@ -271,6 +301,8 @@ const ArtistPanel = () => {
                     }
                 }}
             />
+
+            {/* Removed ArtistProfileModal */}
 
         </div>
     );
