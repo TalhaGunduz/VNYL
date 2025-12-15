@@ -19,8 +19,14 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
         'password',
+        'dob',
+        'gender',
+        'google_id',
+        'avatar',
+        'location',
     ];
 
     /**
@@ -44,5 +50,20 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = ['joined_at'];
+
+    /**
+     * Get the user's joined date in a human readable format.
+     */
+    public function getJoinedAtAttribute(): string
+    {
+        return $this->created_at ? $this->created_at->format('F Y') : 'N/A';
     }
 }

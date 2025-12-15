@@ -1,7 +1,17 @@
 <?php
 
+
+use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+Route::delete('/delete-account', [AuthController::class, 'deleteAccount']);
+Route::middleware(['web'])->group(function () {
+    Route::get('/auth/google', [AuthController::class, 'redirectToGoogle']);
+    Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
+});
 
 Route::get('/tracks', function () {
     return response()->json([

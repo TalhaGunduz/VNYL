@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState, MouseEvent, useEffect } from 'react';
 import { motion, useMotionValue, useSpring, useTransform, MotionValue } from 'framer-motion';
 import { Twitter, Github, Dribbble, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 const tracks = [
   { id: 1, title: 'Neon Dreams', artist: 'Luna Waves', gradient: 'from-[#1f1f1f] via-[#2b2b2b] to-[#3a3a3a]' },
@@ -146,7 +147,7 @@ export default function Home() {
   const accent = '#FF6B00';
   const bg = '#0e0e0e';
   const fg = '#f5f5f5';
-  
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const videoList = useMemo(() => ['/assets/1.mp4', '/assets/2.mp4', '/assets/3.mp4', '/assets/4.mp4', '/assets/5.mp4', '/assets/6.mp4'], []);
@@ -160,6 +161,51 @@ export default function Home() {
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const loginSuccess = params.get('login_success');
+    const error = params.get('error');
+
+    if (loginSuccess === 'true') {
+      // Debug: Log all params to see what backend is sending
+      console.log('Google Callback Params:', Object.fromEntries(params.entries()));
+
+      const userData = {
+        name: params.get('name') || params.get('username') || 'User', // Restore name for Profile.tsx
+        username: params.get('username'),
+        avatar: params.get('avatar'),
+        email: params.get('email'),        // <--- YENİ MİSAFİR 1
+        joinedAt: params.get('joined_at'), // <--- YENİ MİSAFİR 2
+        dob: params.get('dob'),
+        location: params.get('location')   // <--- YENİ MİSAFİR 3 (Hybrid Update)
+      };
+
+      // State'e kaydet (Home'da setUser yok, sadece localStorage yeterli)
+      // setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      // Trigger a storage event so Navbar can update immediately if it listens
+      window.dispatchEvent(new Event('storage'));
+
+      Swal.fire({
+        title: 'Google ile giriş başarılı!',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false
+      });
+      // Temizle
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (error) {
+      Swal.fire({
+        title: 'Hata!',
+        text: 'Google girişi başarısız oldu.',
+        icon: 'error',
+        confirmButtonText: 'Tamam'
+      });
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   const handleScroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -278,6 +324,7 @@ export default function Home() {
               <img src="https://i.pravatar.cc/40?u=a" alt="User avatar" className="h-10 w-10 rounded-full" />
               <p className="text-sm text-white/80">
                 <span className="font-semibold text-white">Caspian Vale</span> uploaded a new track: <span className="text-accent">"Midnight Echoes"</span>
+
               </p>
               <span className="ml-auto text-xs text-white/40">2h ago</span>
             </div>

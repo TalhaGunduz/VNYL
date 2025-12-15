@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { FaGoogle, FaFacebook, FaApple } from 'react-icons/fa';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import Swal from 'sweetalert2';
 
 const Login = () => {
   const videoList = useMemo(() => ['/assets/1.mp4', '/assets/2.mp4', '/assets/3.mp4', '/assets/4.mp4', '/assets/5.mp4', '/assets/6.mp4'], []);
@@ -8,6 +9,70 @@ const Login = () => {
     const randomIndex = Math.floor(Math.random() * videoList.length);
     return videoList[randomIndex];
   }, [videoList]);
+
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Save full user object to localStorage
+        const userToSave = {
+          ...data.user, // All backend fields
+          // Fallbacks if backend structure is flat or different
+          name: data.user?.name || data.name || 'User',
+          email: data.user?.email || data.email || formData.email,
+          avatar: data.user?.avatar || null
+        };
+        localStorage.setItem('user', JSON.stringify(userToSave));
+        window.dispatchEvent(new Event('storage'));
+
+        Swal.fire({
+          title: 'Hoşgeldiniz!',
+          text: 'Giriş başarılı.',
+          icon: 'success',
+          timer: 1500,
+          showConfirmButton: false
+        }).then(() => {
+          navigate('/'); // Ana sayfaya yönlendir
+        });
+      } else {
+        Swal.fire({
+          title: 'Hata!',
+          text: data.message || 'Giriş yapılamadı.',
+          icon: 'error',
+          confirmButtonText: 'Tamam'
+        });
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      Swal.fire({
+        title: 'Hata!',
+        text: 'Sunucu hatası.',
+        icon: 'error',
+        confirmButtonText: 'Tamam'
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-bg text-fg flex items-center justify-center p-4 relative">
@@ -37,7 +102,10 @@ const Login = () => {
         </div>
         <div className="mt-8 space-y-6">
           <div className="flex flex-col space-y-4">
-            <button className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700">
+            <button
+              onClick={() => window.location.href = 'http://127.0.0.1:8000/api/auth/google'}
+              className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+            >
               <FaGoogle className="mr-2" /> Continue with Google
             </button>
             <button className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
@@ -48,14 +116,14 @@ const Login = () => {
             </button>
           </div>
           <div className="relative">
-    <div className="absolute inset-0 flex items-center">
-        <div className="w-full border-t border-gray-700" />
-    </div>
-    <div className="relative flex justify-center text-sm">
-        <span className="px-2 bg-gray-900 text-gray-400 rounded-full">Or continue with email</span>
-    </div>
-</div>
-          <form className="mt-8 space-y-6" action="#" method="POST">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-700" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-gray-900 text-gray-400 rounded-full">Or continue with email</span>
+            </div>
+          </div>
+          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <input type="hidden" name="remember" defaultValue="true" />
             <div className="rounded-md shadow-sm -space-y-px">
               <div>
@@ -68,6 +136,8 @@ const Login = () => {
                   type="email"
                   autoComplete="email"
                   required
+                  value={formData.email}
+                  onChange={handleChange}
                   className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-accent focus:border-accent focus:z-10 sm:text-sm rounded-t-md"
                   placeholder="Email address"
                 />
@@ -82,6 +152,8 @@ const Login = () => {
                   type="password"
                   autoComplete="current-password"
                   required
+                  value={formData.password}
+                  onChange={handleChange}
                   className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-accent focus:border-accent focus:z-10 sm:text-sm rounded-b-md"
                   placeholder="Password"
                 />
