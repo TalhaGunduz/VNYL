@@ -1,268 +1,184 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User as UserIcon, Mail, Calendar, MapPin, Settings, Trash2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Settings, MapPin, Calendar, Music, Heart, Share2, Mail, Trash2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const Profile = () => {
     const navigate = useNavigate();
-    // Using 'any' for flexibility with backend fields
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [user, setUser] = useState<any | null>(null);
-
-    const [isLoading, setIsLoading] = useState(true);
+    const [user, setUser] = useState<any>(null);
 
     useEffect(() => {
-        const stored = localStorage.getItem('user');
-
-        if (stored) {
-            try {
-                const parsedUser = JSON.parse(stored);
-                console.log('Profile Loaded User:', parsedUser); // Debug log
-                setUser(parsedUser);
-            } catch (e) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Oturum Hatası',
-                    text: 'Kullanıcı bilgileri okunamadı, lütfen tekrar giriş yapın.',
-                    showConfirmButton: false,
-                    timer: 1500
-                }).then(() => navigate('/login'));
+        // Load user from localStorage
+        const loadUser = () => {
+            const savedUser = localStorage.getItem('user');
+            if (savedUser) {
+                try {
+                    setUser(JSON.parse(savedUser));
+                } catch (e) {
+                    console.error("Failed to parse user data", e);
+                }
+            } else {
+                navigate('/login');
             }
-        } else {
-            // Only redirect if we are SURE there is no user, but maybe give a small delay or check URL logic?
-            // Actually, if simply navigating to /profile without login, silent redirect is standard. 
-            // But if the user *thought* they were logged in, an alert is nice.
-            Swal.fire({
-                icon: 'warning',
-                title: 'Giriş Yapmalısınız',
-                text: 'Profilinizi görmek için lütfen giriş yapın.',
-                showConfirmButton: false,
-                timer: 1500
-            }).then(() => navigate('/login'));
-        }
-        setIsLoading(false);
+        };
+
+        loadUser();
+
+        // Listen for updates
+        window.addEventListener('storage', loadUser);
+        return () => window.removeEventListener('storage', loadUser);
     }, [navigate]);
 
-    if (isLoading) return <div className="min-h-screen bg-bg text-fg flex items-center justify-center">Loading...</div>;
-
-    const handleLogout = () => {
-        localStorage.removeItem('user');
-        window.dispatchEvent(new Event('storage'));
-        navigate('/');
-        window.location.reload();
-    };
-
-    const handleDeleteAccount = () => {
-        Swal.fire({
-            title: 'Are you absolutely sure?',
-            text: "This action cannot be undone. This will permanently delete your account and remove your data from our servers.",
+    const handleDeleteAccount = async () => {
+        const result = await Swal.fire({
+            title: 'Are you sure?',
+            text: "You won't be able to revert this! Your profile and all data will be permanently deleted.",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Yes, delete my account'
-        }).then(async (result) => {
-            if (result.isConfirmed) {
-                try {
-                    const response = await fetch('http://127.0.0.1:8000/api/delete-account', {
-                        method: 'DELETE',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ email: user?.email }),
+            confirmButtonText: 'Yes, delete it!',
+            background: '#1a1a1a',
+            color: '#fff'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/delete-account', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email: user.email })
+                });
+
+                if (response.ok) {
+                    localStorage.removeItem('user');
+                    window.dispatchEvent(new Event('storage'));
+
+                    await Swal.fire({
+                        title: 'Deleted!',
+                        text: 'Your account has been deleted.',
+                        icon: 'success',
+                        background: '#1a1a1a',
+                        color: '#fff'
                     });
 
-                    if (response.ok) {
-                        localStorage.removeItem('user');
-                        window.dispatchEvent(new Event('storage'));
-                        Swal.fire(
-                            'Deleted!',
-                            'Your account has been deleted.',
-                            'success'
-                        ).then(() => {
-                            navigate('/login');
-                        });
-                    } else {
-                        Swal.fire(
-                            'Error!',
-                            'Failed to delete account.',
-                            'error'
-                        );
-                    }
-                } catch (error) {
-                    console.error('Delete account error:', error);
-                    Swal.fire(
-                        'Error!',
-                        'Server connection failed.',
-                        'error'
-                    );
+                    navigate('/login');
+                } else {
+                    throw new Error('Failed to delete');
                 }
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Failed to delete account. Please try again.',
+                    background: '#1a1a1a',
+                    color: '#fff'
+                });
             }
-        });
-    };
-
-    const getAvatarUrl = () => {
-        if (user?.avatar) return user.avatar;
-        return `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random&size=200`;
+        }
     };
 
     if (!user) return null;
 
     return (
-        <div className="min-h-screen bg-bg text-fg pb-20">
-            {/* Cover Image */}
-            <div className="h-[250px] w-full bg-gradient-to-r from-purple-900 via-indigo-900 to-blue-900 relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1514525253440-b393452e23f0?q=80&w=2874&auto=format&fit=crop')] bg-cover bg-center opacity-40 mix-blend-overlay"></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-bg to-transparent"></div>
+        <div className="min-h-screen bg-[var(--bg)] text-[var(--fg)] relative overflow-x-hidden">
+            {/* Background Gradients */}
+            <div className="fixed top-0 left-0 w-full h-[500px] bg-gradient-to-b from-[#1a1a1a] to-transparent pointer-events-none" />
+            <div className="fixed -top-[200px] -right-[200px] w-[600px] h-[600px] bg-[var(--accent)]/10 rounded-full blur-[120px] pointer-events-none" />
 
-                {/* Decorative Elements */}
-                <div className="absolute top-10 right-10">
-                    <Settings className="text-white/20 h-24 w-24" />
-                </div>
-            </div>
+            <div className="max-w-5xl mx-auto pt-32 px-6 pb-20 relative z-10">
 
-            <div className="max-w-7xl mx-auto px-6 md:px-8 -mt-24 relative z-10">
-                <div className="flex flex-col md:flex-row gap-8">
+                {/* Profile Header Card */}
+                <div className="bg-[var(--bg-card)]/60 backdrop-blur-xl border border-white/5 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-12 shadow-2xl">
 
-                    {/* Sidebar / User Card */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="w-full md:w-[350px] shrink-0 space-y-6"
-                    >
-                        <div className="bg-[#1a1a1a]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl">
-                            <div className="flex flex-col items-center">
-                                <div className="relative group">
-                                    <div className="absolute -inset-1 bg-gradient-to-r from-accent to-purple-600 rounded-full blur opacity-50 group-hover:opacity-100 transition duration-500"></div>
-                                    <img
-                                        src={getAvatarUrl()}
-                                        alt={user.name}
-                                        className="relative w-32 h-32 rounded-full object-cover border-[6px] border-bg shadow-2xl"
-                                    />
-                                </div>
+                    {/* Avatar Group */}
+                    <div className="relative group shrink-0">
+                        <div className="absolute -inset-1 bg-gradient-to-br from-[var(--accent)] to-purple-600 rounded-full opacity-70 blur group-hover:opacity-100 transition-opacity duration-500" />
+                        <img
+                            src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
+                            alt={user.name}
+                            className="relative w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-[#121212] shadow-2xl"
+                        />
+                        {/* Status Indicator (Mock) */}
+                        <div className="absolute bottom-2 right-2 w-6 h-6 bg-[var(--accent)] rounded-full border-4 border-[#121212] z-20" title="Online" />
+                    </div>
 
-                                <h1 className="mt-4 text-2xl font-bold text-white tracking-tight">{user.name}</h1>
-                                <p className="text-white/60 text-sm">@{user.username || user.name?.toLowerCase().replace(/\s/g, '') || 'member'}</p>
-
-                                <div className="mt-6 flex gap-3 w-full">
-                                    <button className="flex-1 py-2 bg-white text-bg font-semibold rounded-xl text-sm hover:bg-white/90 transition-colors">
-                                        Edit Profile
-                                    </button>
-                                    <button className="p-2 border border-white/10 rounded-xl hover:bg-white/5 transition-colors text-white/70">
-                                        <Settings size={20} />
-                                    </button>
-                                </div>
-
-                                <div className="w-full h-px bg-white/10 my-6"></div>
-
-
-
-                                <div className="w-full space-y-4">
-                                    {/* E-posta Alanı */}
-                                    <div className="flex items-center gap-3 text-sm text-white/80">
-                                        <Mail size={16} className="text-white/40" />
-                                        <span className="truncate">{user.email || 'No email provided'}</span>
-                                    </div>
-
-                                    {/* Konum Alanı (Varsa) */}
-                                    <div className="flex items-center gap-3 text-sm text-white/80">
-                                        <MapPin size={16} className="text-white/40" />
-                                        <span>{user.location || 'Unknown Location'}</span>
-                                    </div>
-
-                                    {/* Katılma Tarihi Alanı */}
-                                    <div className="flex items-center gap-3 text-sm text-white/80">
-                                        <Calendar size={16} className="text-white/40" />
-                                        {/* Backend'den 'joined_at' geliyor ama biz state'e 'joinedAt' olarak kaydettiysek: */}
-                                        <span>Joined {user.joinedAt || 'Recently'}</span>
-                                    </div>
-                                </div>
-
-
-                            </div>
-                        </div>
-
-                        {/* Additional Info / Gender / DOB */}
-                        <div className="bg-[#1a1a1a]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-6">
-                            <h3 className="font-semibold text-white/90 mb-4">Personal Information</h3>
-                            <div className="space-y-4">
-                                {user.gender && (
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-white/50">Gender</span>
-                                        <span className="text-white/80 capitalize">{user.gender}</span>
-                                    </div>
-                                )}
-                                {user.dob && (
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-white/50">Date of Birth</span>
-                                        <span className="text-white/80">{user.dob}</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-white/50">User ID</span>
-                                    <span className="text-white/80 font-mono text-xs bg-white/5 px-2 py-1 rounded">{user.id || 'N/A'}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
-
-                    {/* Main Content Area */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                        className="flex-1 space-y-8"
-                    >
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {[
-                                { label: 'Songs Liked', value: '1,284', icon: UserIcon, color: 'text-pink-500' },
-                                { label: 'Playlists', value: '14', icon: UserIcon, color: 'text-violet-500' },
-                                { label: 'Following', value: '248', icon: UserIcon, color: 'text-blue-500' },
-                                { label: 'Followers', value: '892', icon: UserIcon, color: 'text-orange-500' },
-                            ].map((stat, i) => (
-                                <div key={i} className="bg-[#1a1a1a]/60 border border-white/5 rounded-2xl p-5 hover:bg-white/5 transition-colors">
-                                    <stat.icon size={24} className={`${stat.color} mb-3`} />
-                                    <div className="text-2xl font-bold text-white">{stat.value}</div>
-                                    <div className="text-xs text-white/50 font-medium uppercase tracking-wider mt-1">{stat.label}</div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Recent Activity / Placeholders */}
+                    {/* User Info */}
+                    <div className="flex-1 text-center md:text-left space-y-4">
                         <div>
-                            <h2 className="text-xl font-bold mb-4">Recent Activity</h2>
-                            <div className="bg-[#1a1a1a]/40 border border-white/5 rounded-2xl p-8 text-center">
-                                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/5 mb-4">
-                                    <UserIcon size={32} className="text-white/20" />
+                            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white mb-1">{user.name}</h1>
+                            <p className="text-white/40 font-medium text-lg">@{user.username || user.name?.toLowerCase().replace(/\s/g, '') || 'member'}</p>
+                        </div>
+
+                        {/* Bio Box */}
+                        {user.bio && (
+                            <div className="max-w-md mx-auto md:mx-0">
+                                <p className="text-white/80 leading-relaxed italic text-sm md:text-base border-l-2 border-[var(--accent)] pl-4 py-1">
+                                    "{user.bio}"
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Metadata Pills */}
+                        <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-4">
+                            {user.location && (
+                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 text-xs font-medium text-white/60">
+                                    <MapPin size={14} className="text-[var(--accent)]" />
+                                    {user.location}
                                 </div>
-                                <h3 className="text-white font-medium">No recent activity</h3>
-                                <p className="text-white/40 text-sm mt-2">Start listening to music to populate your feed.</p>
+                            )}
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 text-xs font-medium text-white/60">
+                                <Calendar size={14} className="text-[var(--accent)]" />
+                                Joined {user.joinedAt || user.joined_at || user.created_at ? new Date(user.joinedAt || user.joined_at || user.created_at).toLocaleDateString() : 'Recently'}
                             </div>
                         </div>
 
-                        {/* Logout Zone */}
-                        <div className="border-t border-white/5 pt-8">
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-4">
                             <button
-                                onClick={handleLogout}
-                                className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl font-medium text-white/60 hover:text-white hover:bg-white/5 transition-all text-sm group"
+                                onClick={() => navigate('/edit-profile')}
+                                className="px-6 py-2.5 bg-white text-black font-bold rounded-xl text-sm hover:bg-gray-200 transition-colors shadow-lg shadow-white/5"
                             >
-                                <LogOut size={16} className="group-hover:scale-110 transition-transform" />
-                                <span>Sign Out / Çıkış Yap</span>
+                                Edit Profile
                             </button>
-
                             <button
                                 onClick={handleDeleteAccount}
-                                className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-4 rounded-xl font-medium text-red-500/80 hover:text-red-500 hover:bg-red-500/10 transition-all text-sm group border border-transparent hover:border-red-500/20"
+                                className="px-6 py-2.5 bg-red-500/10 text-red-500 font-bold rounded-xl text-sm border border-red-500/20 hover:bg-red-500/20 transition-all"
                             >
-                                <Trash2 size={16} className="group-hover:scale-110 transition-transform" />
-                                <span>Delete Account</span>
+                                <div className="flex items-center gap-2">
+                                    <Trash2 size={16} />
+                                    Delete Account
+                                </div>
                             </button>
                         </div>
-
-                    </motion.div>
+                    </div>
                 </div>
+
+                {/* Content Tabs (Mock) */}
+                <div className="mt-12">
+                    <div className="flex items-center gap-8 border-b border-white/10 pb-4 mb-8">
+                        <button className="text-white font-bold text-lg border-b-2 border-[var(--accent)] pb-4 -mb-4.5">Top Tracks</button>
+                        <button className="text-white/40 font-medium text-lg hover:text-white transition-colors pb-4">Playlists</button>
+                        <button className="text-white/40 font-medium text-lg hover:text-white transition-colors pb-4">Likes</button>
+                    </div>
+
+                    {/* Empty State / Placeholder */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[1, 2, 3].map((item) => (
+                            <div key={item} className="bg-[var(--bg-card)]/40 border border-white/5 rounded-2xl p-4 hover:bg-white/5 transition-all group cursor-pointer">
+                                <div className="aspect-square bg-white/5 rounded-xl mb-4 relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-tr from-[var(--accent)]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <Music className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white/10 group-hover:text-white/30 transition-colors" size={48} />
+                                </div>
+                                <h3 className="font-bold text-white truncate">Untitled Track #{item}</h3>
+                                <p className="text-xs text-white/40 mt-1">Uploaded 2 days ago</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
             </div>
         </div>
     );

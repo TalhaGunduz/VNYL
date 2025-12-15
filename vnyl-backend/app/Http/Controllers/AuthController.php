@@ -42,7 +42,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'User registered successfully',
-            'user' => $user
+            'user' => $user->load('artist')
         ], 201);
     }
 
@@ -65,7 +65,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Login successful',
-            'user' => $user
+            'user' => $user->load('artist')
         ], 200);
     }
 
@@ -141,7 +141,8 @@ class AuthController extends Controller
                 "&email=" . urlencode($user->email) .
                 "&joined_at=" . urlencode($user->created_at->format('F Y')) . 
                 "&dob=" . urlencode($user->dob ?? '') .
-                "&location=" . urlencode($user->location ?? '');
+                "&location=" . urlencode($user->location ?? '') .
+                "&role=" . urlencode($user->role ?? 'user');
             
             return redirect($redirectUrl);
 
@@ -163,5 +164,30 @@ class AuthController extends Controller
         User::where('email', $request->email)->delete();
 
         return response()->json(['message' => 'Account deleted successfully'], 200);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|string|email|exists:users,email',
+            'username' => ['nullable', 'string', 'max:255', Rule::unique('users')->ignore(User::where('email', $request->email)->first()->id)],
+            'name' => 'nullable|string|max:255',
+            'dob' => 'nullable|date',
+            'gender' => ['nullable', Rule::in(['Male', 'Female', 'Non-binary', 'Prefer not to say'])],
+            'location' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+
+        $user->update($request->only(['username', 'name', 'dob', 'gender', 'location']));
+
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'user' => $user
+        ], 200);
     }
 }

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Compass, BarChart3, Upload, User, LogIn, Mic2 } from 'lucide-react';
+import { Music2, Search, Upload, Menu, X, BarChart3, User, LogIn, Compass } from 'lucide-react';
+import ProfileMenu from './ProfileMenu';
 import { useState, useEffect } from 'react';
 
 const Navbar = () => {
@@ -46,32 +47,21 @@ const Navbar = () => {
           )}
         </nav>
         <div className="flex items-center gap-3">
+          {/* Navigation Links (Desktop) */}
+          <div className="hidden md:flex items-center gap-6">
+            {/* Removed redundant Upload link */}
+          </div>
+
+          {/* User Profile / Auth Buttons */}
           {user ? (
-            <Link className="text-white/80 hover:text-white transition-colors flex items-center gap-2" to="/profile">
-              <img
-                src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random`}
-                alt={user.name}
-                className="h-8 w-8 rounded-full object-cover border border-white/10"
-              />
-              <span className="font-medium">{user.name}</span>
-            </Link>
+            <ProfileMenu />
           ) : (
-            <>
-              <Link
-                to="/login"
-                className="px-3 py-2 rounded-xl border border-white/10 text-white/90 hover:text-white hover:border-white/20 transition-colors focus:outline-none focus:ring-2 focus:ring-white/20 flex items-center gap-2 text-sm"
-                aria-label="Login"
-              >
-                <LogIn size={14} /> Login
+            <div className="flex items-center space-x-4">
+              <Link to="/login" className="text-white hover:text-[var(--accent)] transition-colors text-sm font-medium">Login</Link>
+              <Link to="/signup" className="bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white px-5 py-2 rounded-full font-medium transition-all text-sm shadow-lg shadow-[var(--accent)]/20">
+                Sign Up
               </Link>
-              <Link
-                to="/create-account"
-                className="px-3 py-2 rounded-xl text-bg font-medium shadow-sm bg-accent hover:bg-accent-hover transition-colors duration-200 flex items-center gap-2 text-sm"
-                aria-label="Create Account"
-              >
-                <Mic2 size={14} /> Create Account
-              </Link>
-            </>
+            </div>
           )}
         </div>
       </div>

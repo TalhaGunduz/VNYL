@@ -4,9 +4,11 @@
 
 /* App base colors (redundant with inline styles, but ensures background while loading) */
 :root {
-  --bg: #0e0e0e;
-  --fg: #f5f5f5;
-  --accent: #FF6B00;
+  --bg: #09090b; /* Deeper black */
+  --bg-card: #18181b; /* Zinc 900 */
+  --fg: #fafafa;
+  --accent: #FF6B00; /* VNYL Orange/Peach */
+  --accent-light: #FF8534;
 }
 
 html, body, #root {

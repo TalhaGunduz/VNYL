@@ -27,7 +27,30 @@ class User extends Authenticatable
         'google_id',
         'avatar',
         'location',
+        'role',
+        'verification_code',
+        'verification_code_expires_at',
+        'verification_status',
+        'primary_genre',
+        'secondary_genres',
+        'location_city',
+        'location_country',
+        'career_status',
+        'social_instagram',
+        'social_spotify',
+        'social_youtube',
+        'social_soundcloud',
+        'social_apple',
+        'stage_name',
+        'artist_bio',
     ];
+
+    // protected $casts removed in favor of casts() method
+
+    public function artist()
+    {
+        return $this->hasOne(Artist::class);
+    }
 
     /**
      * The attributes that should be hidden for serialization.
@@ -49,6 +72,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'verification_code_expires_at' => 'datetime',
+            'secondary_genres' => 'array',
         ];
     }
 
