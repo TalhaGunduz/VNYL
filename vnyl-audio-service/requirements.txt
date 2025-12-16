@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+numpy
+essentia
+fastapi
+uvicorn
+numpy
+essentia
+python-dotenv
+mutagen
