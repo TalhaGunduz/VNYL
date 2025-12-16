@@ -13,8 +13,29 @@ class Track extends Model
         return $this->hasOne(TrackAnalysis::class);
     }
 
+    protected $appends = ['is_liked', 'likes_count'];
+
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function likedBy()
+    {
+        return $this->belongsToMany(User::class, 'track_likes', 'track_id', 'user_id')->withTimestamps();
+    }
+
+    public function getIsLikedAttribute()
+    {
+        // Check if user is logged in and has liked this track
+        if (auth('sanctum')->check()) {
+            return $this->likedBy()->where('user_id', auth('sanctum')->id())->exists();
+        }
+        return false;
+    }
+
+    public function getLikesCountAttribute()
+    {
+        return $this->likedBy()->count();
     }
 }

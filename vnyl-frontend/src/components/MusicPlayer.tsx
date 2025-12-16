@@ -14,7 +14,8 @@ const MusicPlayer: React.FC = () => {
         setIsExpanded,
         seek,
         setVolume,
-        isVisible
+        isVisible,
+        toggleLike
     } = usePlayer();
 
     // Spacebar to toggle play
@@ -75,8 +76,14 @@ const MusicPlayer: React.FC = () => {
                         <h4 className="font-bold text-white text-sm truncate">{currentTrack.title}</h4>
                         <p className="text-xs text-white/50 truncate hover:text-white transition-colors cursor-pointer">{currentTrack.featured_artist || "Unknown Artist"}</p>
                     </div>
-                    <button className="text-white/40 hover:text-[var(--accent)] transition-colors ml-2">
-                        <Heart size={18} />
+                    <button
+                        className={`transition-colors ml-2 ${currentTrack.is_liked ? 'text-[var(--accent)]' : 'text-white/40 hover:text-white'}`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            toggleLike();
+                        }}
+                    >
+                        <Heart size={18} fill={currentTrack.is_liked ? "currentColor" : "none"} />
                     </button>
                 </div>
 

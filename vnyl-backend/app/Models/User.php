@@ -109,4 +109,12 @@ class User extends Authenticatable
     {
         return $this->verification_status === 'verified';
     }
+
+    /**
+     * The tracks that the user has liked.
+     */
+    public function likes()
+    {
+        return $this->belongsToMany(Track::class, 'track_likes', 'user_id', 'track_id')->withTimestamps();
+    }
 }

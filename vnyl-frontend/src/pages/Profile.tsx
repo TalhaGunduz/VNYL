@@ -9,8 +9,30 @@ const Profile = () => {
     const { playTrack, currentTrack, isPlaying } = usePlayer();
     const [user, setUser] = useState<any>(null);
     const [activeTab, setActiveTab] = useState('likes'); // Default to Likes
-    const [tracks, setTracks] = useState<any[]>([]);
+    const [tracks, setTracks] = useState<any[]>([]); // Uploaded tracks
+    const [likedTracks, setLikedTracks] = useState<any[]>([]); // Liked tracks
     const [activeMenu, setActiveMenu] = useState<{ id: number, x: number, y: number, opensUp?: boolean, opensLeft?: boolean } | null>(null); // Track Menu State
+
+    const fetchTracks = async () => {
+        try {
+            const endpoint = activeTab === 'likes' ? 'my-likes' : 'my-tracks';
+            const response = await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                if (activeTab === 'likes') {
+                    setLikedTracks(data.tracks);
+                } else {
+                    setTracks(data.tracks);
+                }
+            }
+        } catch (err) {
+            console.error("Failed to fetch tracks", err);
+        }
+    };
 
     useEffect(() => {
         // Load user from localStorage
@@ -19,37 +41,60 @@ const Profile = () => {
             try {
                 const parsedUser = JSON.parse(storedUser);
                 setUser(parsedUser);
-
-                // Load tracks (Mock or real API)
-                const fetchTracks = async () => {
-                    try {
-                        const response = await fetch('http://127.0.0.1:8000/api/my-tracks', {
-                            headers: {
-                                'Authorization': `Bearer ${localStorage.getItem('token')}`
-                            }
-                        });
-                        const data = await response.json();
-                        if (data.status === 'success') {
-                            setTracks(data.tracks);
-                        }
-                    } catch (err) {
-                        console.error("Failed to fetch tracks", err);
-                    }
-                };
                 fetchTracks();
-
             } catch (e) {
                 console.error("Failed to parse user data", e);
             }
         } else {
             navigate('/login');
         }
-    }, [navigate]);
+    }, [navigate, activeTab]);
+
+    const handleToggleLike = async (trackId: number) => {
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/api/tracks/${trackId}/like`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                // Optimistic Update
+                const updateList = (list: any[]) => list.map(t =>
+                    t.id === trackId ? { ...t, is_liked: data.liked, likes_count: data.total_likes } : t
+                );
+
+                setTracks(prev => updateList(prev));
+                setLikedTracks(prev => {
+                    // If we unliked it and we are in likes tab, maybe remove it? 
+                    // Or just keep it as unliked until refresh? "Simple" -> distinct heart state.
+                    // The requirement says: "If (user_id, track_id) exists → delete it (unlike)". 
+                    // If I am in 'Liked Tracks' tab and I unlike a song, it should probably disappear or just show unliked state?
+                    // Standard behavior: show unliked state, disappear on refresh/re-visit.
+                    return updateList(prev);
+                });
+
+                // If it was a like (true), and we are not in likes tab, we should probably add it to likedTracks?
+                // Or just re-fetch is safer/easier. 
+                if (data.liked && activeTab !== 'likes') {
+                    // Optionally fetch/update liked tracks in background
+                    // fetchTracks(); 
+                } else if (!data.liked && activeTab === 'likes') {
+                    // Removing from list instantly for snappy feel?
+                    setLikedTracks(prev => prev.filter(t => t.id !== trackId));
+                }
+            }
+        } catch (error) {
+            console.error("Error toggling like", error);
+        }
+    };
     const handleDeleteAccount = async () => {
         const result = await Swal.fire({
             title: 'Are you sure?',
             text: "You won't be able to revert this! Your profile and all data will be permanently deleted.",
-            icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
@@ -267,27 +312,81 @@ const Profile = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
                         {activeTab === 'likes' && (
-                            // Mock Likes
-                            [1, 2, 3, 4, 5].map((item) => (
-                                <div key={item} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center gap-4 hover:bg-white/10 transition-all cursor-pointer group relative overflow-hidden">
-                                    {/* Hover Gradient Glow */}
-                                    <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)]/0 via-[var(--accent)]/5 to-[var(--accent)]/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out pointer-events-none" />
+                            likedTracks.length > 0 ? (
+                                <div className="col-span-1 md:col-span-2 lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6">
+                                    {likedTracks.map((track: any) => (
+                                        <div key={track.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 hover:bg-white/10 transition-all group hover:-translate-y-2 hover:shadow-2xl hover:shadow-[var(--accent)]/10 cursor-pointer">
+                                            <div
+                                                className="aspect-square bg-white/5 rounded-xl mb-4 relative overflow-hidden shadow-lg group-hover:shadow-2xl group-hover:shadow-black/50 transition-all transform-gpu"
+                                                onClick={() => playTrack(track)}
+                                            >
+                                                {track.cover_path ? (
+                                                    <img src={`http://127.0.0.1:8000/storage/${track.cover_path}`} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
+                                                        <Music size={48} className="text-white/20" />
+                                                    </div>
+                                                )}
 
-                                    <div className="w-14 h-14 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl shrink-0 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform relative">
-                                        <Music size={22} className="text-white/40 group-hover:text-white transition-colors" />
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
-                                            <Play size={16} fill="white" className="text-white" />
+                                                {/* Gradient Overlay */}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+
+                                                {/* Play Button */}
+                                                <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${currentTrack?.id === track.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100'}`}>
+                                                    <div className="w-14 h-14 bg-white/10 backdrop-blur-md border border-white/20 rounded-[18px] flex items-center justify-center shadow-2xl text-white hover:bg-white/20 hover:scale-105 transition-all cursor-pointer">
+                                                        {currentTrack?.id === track.id && isPlaying ? (
+                                                            <Pause size={22} fill="white" className="drop-shadow-lg" />
+                                                        ) : (
+                                                            <Play size={22} fill="white" className="ml-1 drop-shadow-lg" />
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Like Button (Top Right) */}
+                                                <button
+                                                    className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all duration-200 transform hover:scale-110 z-10 ${track.is_liked ? 'bg-red-500/20 text-red-500' : 'bg-black/20 text-white/70 hover:bg-black/40 hover:text-white'}`}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleLike(track.id);
+                                                    }}
+                                                >
+                                                    <Heart size={18} fill={track.is_liked ? "currentColor" : "none"} className={`drop-shadow-md ${track.is_liked ? 'animate-in zoom-in spin-in-12 duration-300' : ''}`} />
+                                                </button>
+
+                                                {/* Duration (Bottom Right) */}
+                                                <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity delay-75">
+                                                    <span className="text-xs font-medium text-white/90 tracking-wide drop-shadow-md font-mono">
+                                                        {track.analysis?.duration ? new Date(track.analysis.duration * 1000).toISOString().substr(14, 5) : (track.duration_formatted || '03:42')}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1 relative">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <h3 className="font-bold text-white truncate text-base group-hover:text-[var(--accent)] transition-colors" title={track.title}>
+                                                        {track.title}
+                                                    </h3>
+                                                    {/* Context Menu Button - Simplified */}
+                                                    <button className="text-white/20 hover:text-white transition-colors p-1" onClick={(e) => { e.stopPropagation(); /* Menu logic here if needed, or reuse */ }}>
+                                                        <MoreVertical size={18} />
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-xs text-white/40 truncate flex-1 hover:text-white/60 transition-colors">{track.featured_artist || track.artist?.name || "Unknown Artist"}</p>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="min-w-0">
-                                        <h3 className="font-bold text-white text-base truncate group-hover:text-[var(--accent)] transition-colors">Liked Song #{item}</h3>
-                                        <p className="text-sm text-white/40 truncate">Unknown Artist</p>
-                                    </div>
-                                    <button className="ml-auto w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 text-[var(--accent)] transition-all transform hover:scale-110 active:scale-95">
-                                        <Heart size={20} fill="currentColor" />
-                                    </button>
+                                    ))}
                                 </div>
-                            ))
+                            ) : (
+                                <div className="col-span-full py-24 text-center flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-3xl bg-white/5">
+                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 animate-pulse">
+                                        <Heart size={32} className="text-white/20" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white mb-2">No Liked Tracks</h3>
+                                    <p className="text-white/40 max-w-sm mx-auto">Start exploring and like some tracks to see them here.</p>
+                                </div>
+                            )
                         )}
 
                         {activeTab === 'playlists' && (
@@ -346,7 +445,16 @@ const Profile = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* Top Right: Remove Genre Label (Requested) */}
+                                                    {/* Like Button (Top Right) */}
+                                                    <button
+                                                        className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all duration-200 transform hover:scale-110 z-10 ${track.is_liked ? 'bg-red-500/20 text-red-500' : 'bg-black/20 text-white/70 hover:bg-black/40 hover:text-white'}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleToggleLike(track.id);
+                                                        }}
+                                                    >
+                                                        <Heart size={18} fill={track.is_liked ? "currentColor" : "none"} className={`drop-shadow-md ${track.is_liked ? 'animate-in zoom-in spin-in-12 duration-300' : ''}`} />
+                                                    </button>
 
                                                     {/* Bottom Left: BPM */}
                                                     <div className="absolute bottom-3 left-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity delay-75">
@@ -454,6 +562,25 @@ const Profile = () => {
                         }}
                     >
                         <div className="p-1 space-y-0.5">
+                            {/* Find the track object to check like status */}
+                            {(() => {
+                                const menuTrack = (activeTab === 'likes' ? likedTracks : tracks).find(t => t.id === activeMenu.id);
+                                if (!menuTrack) return null;
+
+                                return (
+                                    <button
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                                        onClick={() => {
+                                            handleToggleLike(menuTrack.id);
+                                            setActiveMenu(null);
+                                        }}
+                                    >
+                                        <Heart size={16} fill={menuTrack.is_liked ? "currentColor" : "none"} className={menuTrack.is_liked ? "text-red-500" : ""} />
+                                        {menuTrack.is_liked ? "Remove from Queue" : "Like Song"} {/* Wait, UI says 'Add to Liked Songs' or just 'Like Song'? Screenshot says 'Add to Queue' etc. I will use 'Like Song' / 'Liked' */}
+                                    </button>
+                                );
+                            })()}
+
                             <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left">
                                 <ListPlus size={16} />
                                 Add to Queue

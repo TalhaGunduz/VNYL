@@ -51,4 +51,8 @@ Route::post('/publish', [TrackController::class, 'publish']);
 Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::put('/tracks/{id}', [TrackController::class, 'update']);
     Route::delete('/tracks/{id}', [TrackController::class, 'destroy']);
+    
+    // Like System
+    Route::post('/tracks/{id}/like', [\App\Http\Controllers\LikeController::class, 'toggleLike']);
+    Route::get('/my-likes', [\App\Http\Controllers\LikeController::class, 'myLikes']);
 });

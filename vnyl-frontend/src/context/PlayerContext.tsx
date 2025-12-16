@@ -14,7 +14,10 @@ interface Track {
         mode?: string;
         energy?: number;
         primary_genre?: string;
+        duration?: number;
     };
+    is_liked?: boolean;
+    likes_count?: number;
 }
 
 interface PlayerContextType {
@@ -30,6 +33,7 @@ interface PlayerContextType {
     seek: (time: number) => void;
     setVolume: (vol: number) => void;
     isVisible: boolean;
+    toggleLike: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -50,7 +54,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const restrictedRoutes = [
         '/upload',
         '/edit-profile',
-        '/settings', // Assuming settings route exists or will exist
+        '/settings',
         '/login',
         '/signup',
         '/create-account',
@@ -71,7 +75,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setIsVisible(false);
             setIsExpanded(false); // Also collapse if expanded
         } else {
-            // Show player (but don't auto-resume unless we want to, likely just show bar)
+            // Show player
             setIsVisible(true);
         }
     }, [location.pathname]);
@@ -88,7 +92,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const updateDuration = () => setDuration(audio.duration);
         const onEnded = () => {
             setIsPlaying(false);
-            // logic for next track could go here
         };
 
         audio.addEventListener('timeupdate', updateTime);
@@ -135,6 +138,28 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     };
 
+    // Toggle Like for Current Track
+    const toggleLike = async () => {
+        if (!currentTrack) return;
+
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/api/tracks/${currentTrack.id}/like`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                setCurrentTrack(prev => prev ? { ...prev, is_liked: data.liked, likes_count: data.total_likes } : null);
+            }
+        } catch (error) {
+            console.error("Error toggling like", error);
+        }
+    };
+
     const seek = (time: number) => {
         if (audioRef.current) {
             audioRef.current.currentTime = time;
@@ -162,7 +187,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setIsExpanded,
             seek,
             setVolume: handleVolumeChange,
-            isVisible
+            isVisible,
+            toggleLike
         }}>
             {children}
         </PlayerContext.Provider>
