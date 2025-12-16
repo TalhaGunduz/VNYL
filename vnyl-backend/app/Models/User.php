@@ -26,6 +26,7 @@ class User extends Authenticatable
         'dob',
         'gender',
         'google_id',
+        'facebook_id',
         'avatar',
         'location',
         'role',

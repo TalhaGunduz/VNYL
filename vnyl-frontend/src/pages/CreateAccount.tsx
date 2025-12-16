@@ -20,14 +20,17 @@ const CreateAccount = () => {
     gender: 'Gender',
     google_id: '',
     avatar: '',
-    location: ''
+    location: '',
+    facebook_id: ''
   });
 
   const [isGoogleSignup, setIsGoogleSignup] = useState(false);
+  const [isFacebookSignup, setIsFacebookSignup] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const googlePending = params.get('google_pending');
+    const facebookPending = params.get('facebook_pending');
 
     if (googlePending === 'true') {
       setIsGoogleSignup(true);
@@ -38,6 +41,15 @@ const CreateAccount = () => {
         google_id: params.get('google_id') || '',
         avatar: params.get('avatar') || '',
         location: params.get('location') || ''
+      }));
+    } else if (facebookPending === 'true') {
+      setIsFacebookSignup(true);
+      setFormData(prev => ({
+        ...prev,
+        email: params.get('email') || '',
+        username: params.get('name') || '',
+        facebook_id: params.get('facebook_id') || '',
+        avatar: params.get('avatar') || ''
       }));
     }
   }, []);
@@ -176,12 +188,13 @@ const CreateAccount = () => {
             >
               <FaGoogle className="mr-2" /> Sign up with Google
             </button>
-            <button className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+            <button
+              onClick={() => window.location.href = 'http://127.0.0.1:8000/api/auth/facebook'}
+              className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+            >
               <FaFacebook className="mr-2" /> Sign up with Facebook
             </button>
-            <button className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-800 hover:bg-gray-900">
-              <FaApple className="mr-2" /> Sign up with Apple
-            </button>
+
           </div>
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -197,11 +210,11 @@ const CreateAccount = () => {
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="username" className="sr-only">Username</label>
-              <input id="username" name="username" type="text" required value={formData.username} onChange={handleChange} disabled={isGoogleSignup} className={`appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-accent focus:border-accent focus:z-10 sm:text-sm rounded-t-md ${isGoogleSignup ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Username" />
+              <input id="username" name="username" type="text" required value={formData.username} onChange={handleChange} disabled={isGoogleSignup || isFacebookSignup} className={`appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-accent focus:border-accent focus:z-10 sm:text-sm rounded-t-md ${isGoogleSignup || isFacebookSignup ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Username" />
             </div>
             <div>
               <label htmlFor="email-address" className="sr-only">Email address</label>
-              <input id="email-address" name="email" type="email" autoComplete="email" required value={formData.email} onChange={handleChange} disabled={isGoogleSignup} className={`appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-accent focus:border-accent focus:z-10 sm:text-sm ${isGoogleSignup ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Email address" />
+              <input id="email-address" name="email" type="email" autoComplete="email" required value={formData.email} onChange={handleChange} disabled={isGoogleSignup || isFacebookSignup} className={`appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-accent focus:border-accent focus:z-10 sm:text-sm ${isGoogleSignup || isFacebookSignup ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Email address" />
             </div>
             <div>
               <label htmlFor="password" className="sr-only">Password</label>

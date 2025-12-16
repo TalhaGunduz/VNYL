@@ -26,6 +26,8 @@ Route::get('/artist/stats', [\App\Http\Controllers\ArtistController::class, 'get
 Route::middleware(['web'])->group(function () {
     Route::get('/auth/google', [AuthController::class, 'redirectToGoogle']);
     Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
+    Route::get('/auth/facebook', [AuthController::class, 'redirectToFacebook']);
+    Route::get('/auth/facebook/callback', [AuthController::class, 'handleFacebookCallback']);
 });
 
 Route::get('/tracks', function () {

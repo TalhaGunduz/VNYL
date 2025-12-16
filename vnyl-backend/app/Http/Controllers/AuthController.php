@@ -260,4 +260,63 @@ class AuthController extends Controller
             return response()->json(['message' => 'Internal Server Error', 'error' => $e->getMessage()], 500);
         }
     }
+    public function redirectToFacebook()
+    {
+        return \Laravel\Socialite\Facades\Socialite::driver('facebook')->redirect();
+    }
+
+    public function handleFacebookCallback(Request $request)
+    {
+        try {
+            $facebookUser = \Laravel\Socialite\Facades\Socialite::driver('facebook')->user();
+            $user = User::where('email', $facebookUser->getEmail())->first();
+
+            if (!$user) {
+                // User does not exist, redirect to frontend registration page
+                $redirectUrl = "http://localhost:5173/create-account" .
+                    "?facebook_pending=true" .
+                    "&email=" . urlencode($facebookUser->getEmail()) .
+                    "&name=" . urlencode($facebookUser->getName()) .
+                    "&facebook_id=" . urlencode($facebookUser->getId()) .
+                    "&avatar=" . urlencode($facebookUser->getAvatar());
+                
+                return redirect($redirectUrl);
+            } else {
+                // User exists, update fields (Optional: update avatar or name if missing)
+                $dataToUpdate = [
+                    'facebook_id' => $facebookUser->getId(),
+                ];
+
+                if (empty($user->avatar)) {
+                    $dataToUpdate['avatar'] = $facebookUser->getAvatar();
+                }
+
+                $user->update($dataToUpdate);
+            }
+
+            // Create Token
+            $token = $user->createToken('auth_token')->plainTextToken;
+            
+            // Safely get artist relationship
+            $artist = $user->artist;
+
+            // Redirect with user details (Login Success) AND Token
+            $redirectUrl = "http://localhost:5173?login_success=true" .
+                "&username=" . urlencode($user->username) .
+                "&name=" . urlencode($user->name) .
+                "&avatar=" . urlencode($user->avatar) .
+                "&email=" . urlencode($user->email) .
+                "&role=" . urlencode($user->role ?? 'user') .
+                "&is_artist=" . ($user->is_artist ? 'true' : 'false') .
+                "&is_verified=" . ($user->is_verified ? 'true' : 'false') .
+                "&id=" . urlencode($user->id) .
+                "&token=" . urlencode($token);
+            
+            return redirect($redirectUrl);
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Facebook Login Error: ' . $e->getMessage());
+            return redirect("http://localhost:5173?error=facebook_login_failed&message=" . urlencode($e->getMessage()));
+        }
+    }
 }

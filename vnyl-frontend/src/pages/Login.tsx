@@ -111,12 +111,13 @@ const Login = () => {
             >
               <FaGoogle className="mr-2" /> Continue with Google
             </button>
-            <button className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+            <button
+              onClick={() => window.location.href = 'http://127.0.0.1:8000/api/auth/facebook'}
+              className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+            >
               <FaFacebook className="mr-2" /> Continue with Facebook
             </button>
-            <button className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-800 hover:bg-gray-900">
-              <FaApple className="mr-2" /> Continue with Apple
-            </button>
+
           </div>
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
