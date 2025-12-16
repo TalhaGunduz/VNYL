@@ -176,7 +176,7 @@ const EditProfile = () => {
                             </div>
                         </div>
 
-                        {/* Name */}
+                        {/* Name (Display Name) */}
                         <div className="space-y-2">
                             <label className="text-sm text-white/60 font-medium">Display Name</label>
                             <div className="relative">
@@ -187,12 +187,13 @@ const EditProfile = () => {
                                     value={formData.name}
                                     onChange={handleChange}
                                     className="w-full bg-black/20 border border-white/10 rounded-xl py-2 pl-10 pr-4 focus:outline-none focus:border-accent transition-colors"
-                                    placeholder="Your Name"
+                                    placeholder="e.g. Talha Gündüz"
                                 />
                             </div>
+                            <p className="text-xs text-white/30 ml-1">Your real name as it appears on your profile.</p>
                         </div>
 
-                        {/* Username */}
+                        {/* Username (Unique Handle) */}
                         <div className="space-y-2">
                             <label className="text-sm text-white/60 font-medium">Username</label>
                             <div className="relative">
@@ -202,10 +203,14 @@ const EditProfile = () => {
                                     name="username"
                                     value={formData.username}
                                     onChange={handleChange}
-                                    className="w-full bg-black/20 border border-white/10 rounded-xl py-2 pl-8 pr-4 focus:outline-none focus:border-accent transition-colors"
+                                    className="w-full bg-black/20 border border-white/10 rounded-xl py-2 pl-8 pr-4 focus:outline-none focus:border-accent transition-colors font-mono text-sm"
                                     placeholder="username"
                                 />
                             </div>
+                            <p className="text-xs text-white/30 ml-1 flex flex-col gap-0.5">
+                                <span>Unique handle for mentions and friends.</span>
+                                <span className="text-[var(--accent)]/70">• Lowercase only • No spaces • Unique</span>
+                            </p>
                         </div>
 
                         {/* Location */}
