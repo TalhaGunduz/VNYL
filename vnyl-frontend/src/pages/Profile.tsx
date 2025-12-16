@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Music, Heart, Trash2, Play, Pause, MoreVertical, ListPlus, Share2, User, ListMusic, X } from 'lucide-react';
+import { MapPin, Calendar, Music, Heart, Trash2, Play, Pause, MoreVertical, ListPlus, Share2, User, ListMusic, X, Lock, Globe } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { usePlayer } from '../context/PlayerContext';
+import AddToPlaylistModal from '../components/AddToPlaylistModal';
+import PlaylistModal from '../components/PlaylistModal';
 
 const Profile = () => {
     const navigate = useNavigate();
@@ -11,11 +13,20 @@ const Profile = () => {
     const [activeTab, setActiveTab] = useState('likes'); // Default to Likes
     const [tracks, setTracks] = useState<any[]>([]); // Uploaded tracks
     const [likedTracks, setLikedTracks] = useState<any[]>([]); // Liked tracks
+    const [playlists, setPlaylists] = useState<any[]>([]); // Playlists
     const [activeMenu, setActiveMenu] = useState<{ id: number, x: number, y: number, opensUp?: boolean, opensLeft?: boolean } | null>(null); // Track Menu State
+    const [addToPlaylistTrackId, setAddToPlaylistTrackId] = useState<number | null>(null); // Add to Playlist Modal State
+    const [isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState(false);
 
     const fetchTracks = async () => {
         try {
-            const endpoint = activeTab === 'likes' ? 'my-likes' : 'my-tracks';
+            let endpoint = '';
+            if (activeTab === 'likes') endpoint = 'my-likes';
+            else if (activeTab === 'my_tracks') endpoint = 'my-tracks';
+            else if (activeTab === 'playlists') endpoint = 'playlists';
+
+            if (!endpoint) return;
+
             const response = await fetch(`http://127.0.0.1:8000/api/${endpoint}`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -25,14 +36,56 @@ const Profile = () => {
             if (data.status === 'success') {
                 if (activeTab === 'likes') {
                     setLikedTracks(data.tracks);
+                } else if (activeTab === 'playlists') {
+                    setPlaylists(data.playlists);
                 } else {
                     setTracks(data.tracks);
                 }
             }
         } catch (err) {
-            console.error("Failed to fetch tracks", err);
+            console.error("Failed to fetch data", err);
         }
     };
+
+    const handleCreatePlaylist = async (title: string, description: string, isPublic: boolean) => {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/playlists', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    title,
+                    description,
+                    is_public: isPublic
+                })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                const Toast = Swal.mixin({
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000,
+                    background: 'rgba(20, 20, 20, 0.9)',
+                    color: '#fff',
+                    customClass: { popup: 'backdrop-blur-md border border-white/10' }
+                });
+                Toast.fire({ icon: 'success', title: 'Playlist Created' });
+                fetchTracks(); // Refresh
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const handleAddToPlaylist = (trackId: number) => {
+        setAddToPlaylistTrackId(trackId);
+        setActiveMenu(null);
+    };
+
+
 
     useEffect(() => {
         // Load user from localStorage
@@ -51,6 +104,8 @@ const Profile = () => {
     }, [navigate, activeTab]);
 
     const handleToggleLike = async (trackId: number) => {
+
+
         try {
             const response = await fetch(`http://127.0.0.1:8000/api/tracks/${trackId}/like`, {
                 method: 'POST',
@@ -390,21 +445,56 @@ const Profile = () => {
                         )}
 
                         {activeTab === 'playlists' && (
-                            // Mock Playlists
-                            [1, 2, 3].map((item) => (
-                                <div key={item} className="bg-white/5 border border-white/5 rounded-2xl p-5 hover:bg-white/10 transition-all cursor-pointer group hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--accent)]/10">
-                                    <div className="aspect-square bg-gradient-to-br from-indigo-900 to-purple-900 rounded-xl mb-4 flex items-center justify-center relative overflow-hidden shadow-2xl">
-                                        {/* Gradient Overlay */}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-60" />
-                                        <span className="text-4xl font-black text-white/20 relative z-10">#{item}</span>
-                                        <div className="absolute bottom-3 right-3 w-10 h-10 bg-[var(--accent)] rounded-full flex items-center justify-center shadow-lg translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-                                            <Play size={18} fill="white" className="text-white" />
-                                        </div>
+                            <div className="col-span-1 md:col-span-2 lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                                {/* Create New Playlist Card */}
+                                <div
+                                    onClick={() => setIsCreatePlaylistModalOpen(true)}
+                                    className="aspect-square bg-white/5 border border-white/5 border-dashed rounded-2xl flex flex-col items-center justify-center hover:bg-white/10 transition-all cursor-pointer group hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--accent)]/10"
+                                >
+                                    <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                        <ListPlus size={28} className="text-white/40 group-hover:text-white" />
                                     </div>
-                                    <h3 className="font-bold text-white text-lg truncate group-hover:text-[var(--accent)] transition-colors">Vibe Playlist #{item}</h3>
-                                    <p className="text-sm text-white/40 mt-1">12 Songs • Updated yesterday</p>
+                                    <h3 className="font-bold text-white text-base">Create</h3>
+                                    <p className="text-xs text-white/40 mt-0.5">New Playlist</p>
                                 </div>
-                            ))
+
+                                {/* Create Modal */}
+                                <PlaylistModal
+                                    mode="create"
+                                    isOpen={isCreatePlaylistModalOpen}
+                                    onClose={() => setIsCreatePlaylistModalOpen(false)}
+                                    onSave={handleCreatePlaylist}
+                                />
+
+                                {/* Real Playlists */}
+                                {playlists.map((playlist: any) => (
+                                    <div key={playlist.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 hover:bg-white/10 transition-all cursor-pointer group hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--accent)]/10" onClick={() => navigate(`/playlists/${playlist.id}`)}>
+                                        <div className="aspect-square bg-gradient-to-br from-indigo-900 to-purple-900 rounded-xl mb-4 flex items-center justify-center relative overflow-hidden shadow-2xl">
+                                            {/* Gradient Overlay */}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-60" />
+                                            {/* Placeholder Art */}
+                                            <div className="absolute inset-0 grid grid-cols-2 gap-0.5 opacity-50">
+                                                <div className="bg-white/10"></div>
+                                                <div className="bg-white/5"></div>
+                                                <div className="bg-white/5"></div>
+                                                <div className="bg-white/10"></div>
+                                            </div>
+
+                                            <div className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 backdrop-blur-md z-20">
+                                                {!playlist.is_public ? <Lock size={12} className="text-white/70" /> : <Globe size={12} className="text-white/70" />}
+                                            </div>
+
+                                            <span className="text-3xl font-black text-white/20 relative z-10 uppercase">{playlist.title.substring(0, 2)}</span>
+
+                                            <div className="absolute bottom-3 right-3 w-10 h-10 bg-[var(--accent)] rounded-full flex items-center justify-center shadow-lg translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                                                <Play size={18} fill="white" className="text-white" />
+                                            </div>
+                                        </div>
+                                        <h3 className="font-bold text-white text-base truncate group-hover:text-[var(--accent)] transition-colors">{playlist.title}</h3>
+                                        <p className="text-xs text-white/40 mt-1">{playlist.tracks_count || 0} Songs</p>
+                                    </div>
+                                ))}
+                            </div>
                         )}
 
                         {activeTab === 'my_tracks' && (
@@ -550,6 +640,7 @@ const Profile = () => {
             </div>
 
             {/* Global Context Menu (Rendered at Root with Absolute Positioning) */}
+            {/* Global Context Menu (Rendered at Root with Absolute Positioning) */}
             {activeMenu && (
                 <>
                     <div className="fixed inset-0 z-[9998]" onClick={() => setActiveMenu(null)} />
@@ -576,7 +667,7 @@ const Profile = () => {
                                         }}
                                     >
                                         <Heart size={16} fill={menuTrack.is_liked ? "currentColor" : "none"} className={menuTrack.is_liked ? "text-red-500" : ""} />
-                                        {menuTrack.is_liked ? "Remove from Queue" : "Like Song"} {/* Wait, UI says 'Add to Liked Songs' or just 'Like Song'? Screenshot says 'Add to Queue' etc. I will use 'Like Song' / 'Liked' */}
+                                        {menuTrack.is_liked ? "Remove from Queue" : "Like Song"}
                                     </button>
                                 );
                             })()}
@@ -585,7 +676,14 @@ const Profile = () => {
                                 <ListPlus size={16} />
                                 Add to Queue
                             </button>
-                            <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left">
+                            <button
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                                onClick={() => {
+                                    if (activeMenu) {
+                                        handleAddToPlaylist(activeMenu.id);
+                                    }
+                                }}
+                            >
                                 <ListMusic size={16} />
                                 Add to Playlist
                             </button>
@@ -602,6 +700,12 @@ const Profile = () => {
                     </div>
                 </>
             )}
+
+            {/* Custom Add to Playlist Modal */}
+            <AddToPlaylistModal
+                trackId={addToPlaylistTrackId}
+                onClose={() => setAddToPlaylistTrackId(null)}
+            />
         </div>
     );
 };

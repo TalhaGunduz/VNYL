@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import Profile from './pages/Profile';
 import EditProfile from './pages/EditProfile';
 import Upload from './pages/Upload';
+import PlaylistDetail from './pages/PlaylistDetail'; // Import
 import BecomeArtist from './pages/BecomeArtist'; // Added import for BecomeArtist
 import ArtistPanel from './pages/ArtistPanel';
 import ArtistProfileSetup from './pages/ArtistProfileSetup';
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/edit-profile" element={<EditProfile />} />
           <Route path="/upload" element={<Upload />} />
+          <Route path="/playlists/:id" element={<PlaylistDetail />} />
           <Route path="/become-artist" element={<BecomeArtist />} />
           <Route path="/artist-panel" element={<ArtistPanel />} />
           <Route path="/artist/complete-profile" element={<ArtistProfileSetup />} />

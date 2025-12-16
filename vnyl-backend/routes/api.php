@@ -5,6 +5,9 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\TrackController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AudioServiceController;
+use App\Http\Controllers\LikeController;
+use App\Http\Controllers\PlaylistController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -48,11 +51,19 @@ Route::get('/my-tracks', [TrackController::class, 'index']); // Public for now o
 Route::post('/analyze', [TrackController::class, 'analyze']);
 Route::post('/publish', [TrackController::class, 'publish']);
 
-Route::group(['middleware' => ['auth:sanctum']], function () {
+Route::middleware(['auth:sanctum'])->group(function () {
     Route::put('/tracks/{id}', [TrackController::class, 'update']);
     Route::delete('/tracks/{id}', [TrackController::class, 'destroy']);
     
     // Like System
-    Route::post('/tracks/{id}/like', [\App\Http\Controllers\LikeController::class, 'toggleLike']);
-    Route::get('/my-likes', [\App\Http\Controllers\LikeController::class, 'myLikes']);
+    Route::post('/tracks/{id}/like', [LikeController::class, 'toggleLike']);
+    Route::get('/my-likes', [LikeController::class, 'myLikes']);
+
+    // Playlists
+    Route::get('/playlists', [PlaylistController::class, 'index']); // List my playlists
+    Route::post('/playlists', [PlaylistController::class, 'store']); // Create
+    Route::get('/playlists/{id}', [PlaylistController::class, 'show']); // View
+    Route::put('/playlists/{id}', [PlaylistController::class, 'update']); // Update Settings
+    Route::post('/playlists/{id}/tracks', [PlaylistController::class, 'addTrack']); // Add Track
+    Route::delete('/playlists/{id}/tracks', [PlaylistController::class, 'removeTrack']); // Remove Track
 });

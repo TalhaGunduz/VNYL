@@ -117,4 +117,9 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Track::class, 'track_likes', 'user_id', 'track_id')->withTimestamps();
     }
+
+    public function playlists()
+    {
+        return $this->hasMany(Playlist::class);
+    }
 }

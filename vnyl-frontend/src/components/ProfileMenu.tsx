@@ -49,9 +49,10 @@ const ProfileMenu = () => {
 
     const handleLogout = () => {
         localStorage.removeItem('user');
+        localStorage.removeItem('token'); // Also remove token if present
         window.dispatchEvent(new Event('storage'));
-        navigate('/');
-        setIsOpen(false);
+        // Force reload to clear all states (Audio, Context, etc)
+        window.location.href = '/login';
     };
 
     if (!user) return null;
