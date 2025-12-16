@@ -11,22 +11,28 @@ import BecomeArtist from './pages/BecomeArtist'; // Added import for BecomeArtis
 import ArtistPanel from './pages/ArtistPanel';
 import ArtistProfileSetup from './pages/ArtistProfileSetup';
 
+import { PlayerProvider } from './context/PlayerContext';
+import MusicPlayer from './components/MusicPlayer';
+
 export default function App() {
   return (
     <Router>
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/create-account" element={<CreateAccount />} />
-        <Route path="/signup" element={<CreateAccount />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/edit-profile" element={<EditProfile />} />
-        <Route path="/upload" element={<Upload />} />
-        <Route path="/become-artist" element={<BecomeArtist />} />
-        <Route path="/artist-panel" element={<ArtistPanel />} />
-        <Route path="/artist/complete-profile" element={<ArtistProfileSetup />} />
-      </Routes>
+      <PlayerProvider>
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/create-account" element={<CreateAccount />} />
+          <Route path="/signup" element={<CreateAccount />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/edit-profile" element={<EditProfile />} />
+          <Route path="/upload" element={<Upload />} />
+          <Route path="/become-artist" element={<BecomeArtist />} />
+          <Route path="/artist-panel" element={<ArtistPanel />} />
+          <Route path="/artist/complete-profile" element={<ArtistProfileSetup />} />
+        </Routes>
+        <MusicPlayer />
+      </PlayerProvider>
     </Router>
   );
 }

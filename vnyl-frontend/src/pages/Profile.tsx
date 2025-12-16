@@ -1,21 +1,33 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, MapPin, Calendar, Music, Heart, Share2, Mail, Trash2 } from 'lucide-react';
+import { MapPin, Calendar, Music, Heart, Trash2, Play, Pause } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { usePlayer } from '../context/PlayerContext';
 
 const Profile = () => {
     const navigate = useNavigate();
+    const { playTrack, currentTrack, isPlaying } = usePlayer();
     const [user, setUser] = useState<any>(null);
+    const [activeTab, setActiveTab] = useState('likes'); // Default to Likes
+    const [tracks, setTracks] = useState<any[]>([]);
 
     useEffect(() => {
         // Load user from localStorage
-        const loadUser = () => {
+        const loadUser = async () => {
             const savedUser = localStorage.getItem('user');
             if (savedUser) {
                 try {
-                    setUser(JSON.parse(savedUser));
+                    const parsedUser = JSON.parse(savedUser);
+                    setUser(parsedUser);
+
+                    // Fetch tracks
+                    const response = await fetch('http://127.0.0.1:8000/api/my-tracks');
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        setTracks(data.tracks);
+                    }
                 } catch (e) {
-                    console.error("Failed to parse user data", e);
+                    console.error("Failed to parse user data or fetch tracks", e);
                 }
             } else {
                 navigate('/login');
@@ -163,26 +175,107 @@ const Profile = () => {
                     </div>
                 </div>
 
-                {/* Content Tabs (Mock) */}
+                {/* Content Tabs */}
                 <div className="mt-12">
                     <div className="flex items-center gap-8 border-b border-white/10 pb-4 mb-8">
-                        <button className="text-white font-bold text-lg border-b-2 border-[var(--accent)] pb-4 -mb-4.5">Top Tracks</button>
-                        <button className="text-white/40 font-medium text-lg hover:text-white transition-colors pb-4">Playlists</button>
-                        <button className="text-white/40 font-medium text-lg hover:text-white transition-colors pb-4">Likes</button>
+                        <button
+                            onClick={() => setActiveTab('likes')}
+                            className={`font-bold text-lg pb-4 -mb-4.5 transition-colors ${activeTab === 'likes' ? 'text-white border-b-2 border-[var(--accent)]' : 'text-white/40 hover:text-white'}`}
+                        >
+                            Liked Songs
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('playlists')}
+                            className={`font-bold text-lg pb-4 -mb-4.5 transition-colors ${activeTab === 'playlists' ? 'text-white border-b-2 border-[var(--accent)]' : 'text-white/40 hover:text-white'}`}
+                        >
+                            Playlists
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('my_tracks')}
+                            className={`font-bold text-lg pb-4 -mb-4.5 transition-colors ${activeTab === 'my_tracks' ? 'text-white border-b-2 border-[var(--accent)]' : 'text-white/40 hover:text-white'}`}
+                        >
+                            My Tracks
+                        </button>
                     </div>
 
-                    {/* Empty State / Placeholder */}
+                    {/* Tab Content */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[1, 2, 3].map((item) => (
-                            <div key={item} className="bg-[var(--bg-card)]/40 border border-white/5 rounded-2xl p-4 hover:bg-white/5 transition-all group cursor-pointer">
-                                <div className="aspect-square bg-white/5 rounded-xl mb-4 relative overflow-hidden">
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-[var(--accent)]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <Music className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white/10 group-hover:text-white/30 transition-colors" size={48} />
+
+                        {activeTab === 'likes' && (
+                            // Mock Likes
+                            [1, 2, 3, 4, 5].map((item) => (
+                                <div key={item} className="bg-[var(--bg-card)]/40 border border-white/5 rounded-2xl p-4 flex items-center gap-4 opacity-50 hover:bg-white/5 transition-all cursor-pointer group">
+                                    <div className="w-12 h-12 bg-white/10 rounded-lg shrink-0 flex items-center justify-center">
+                                        <Music size={20} className="text-white/20 group-hover:text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-white text-sm">Liked Song #{item}</h3>
+                                        <p className="text-xs text-white/40">Unknown Artist</p>
+                                    </div>
+                                    <Heart size={16} className="ml-auto text-[var(--accent)] fill-[var(--accent)]" />
                                 </div>
-                                <h3 className="font-bold text-white truncate">Untitled Track #{item}</h3>
-                                <p className="text-xs text-white/40 mt-1">Uploaded 2 days ago</p>
-                            </div>
-                        ))}
+                            ))
+                        )}
+
+                        {activeTab === 'playlists' && (
+                            // Mock Playlists
+                            [1, 2, 3].map((item) => (
+                                <div key={item} className="bg-[var(--bg-card)]/40 border border-white/5 rounded-2xl p-4 opacity-70 hover:opacity-100 transition-all cursor-pointer grayscale hover:grayscale-0 group">
+                                    <div className="aspect-square bg-gradient-to-br from-indigo-900 to-purple-900 rounded-xl mb-4 flex items-center justify-center group-hover:scale-[1.02] transition-transform">
+                                        <span className="text-2xl font-bold text-white/20">#{item}</span>
+                                    </div>
+                                    <h3 className="font-bold text-white">Vibe Playlist #{item}</h3>
+                                    <p className="text-xs text-white/40 mt-1">12 Songs • Updated yesterday</p>
+                                </div>
+                            ))
+                        )}
+
+                        {activeTab === 'my_tracks' && (
+                            tracks.length > 0 ? (
+                                tracks.map((track: any) => (
+                                    <div key={track.id} className="bg-[var(--bg-card)]/40 border border-white/5 rounded-2xl p-4 hover:bg-white/5 transition-all group">
+                                        <div
+                                            className="aspect-square bg-white/5 rounded-xl mb-4 relative overflow-hidden cursor-pointer"
+                                            onClick={() => playTrack(track)}
+                                        >
+                                            {track.cover_path ? (
+                                                <img src={`http://127.0.0.1:8000/storage/${track.cover_path}`} alt={track.title} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
+                                                    <Music size={48} className="text-white/20" />
+                                                </div>
+                                            )}
+
+                                            {/* Play Overlay */}
+                                            <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${currentTrack?.id === track.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                                <div className="w-12 h-12 bg-[var(--accent)] rounded-full flex items-center justify-center shadow-lg text-white hover:scale-110 transition-transform">
+                                                    {currentTrack?.id === track.id && isPlaying ? (
+                                                        <Pause size={20} fill="currentColor" />
+                                                    ) : (
+                                                        <Play size={20} fill="currentColor" className="ml-1" />
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="absolute bottom-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <span className="text-xs font-bold bg-black/50 px-2 py-1 rounded backdrop-blur-md text-white">{track.analysis?.bpm ? Math.round(track.analysis.bpm) : '--'} BPM</span>
+                                            </div>
+                                        </div>
+                                        <h3 className="font-bold text-white truncate">{track.title}</h3>
+                                        <p className="text-xs text-white/40 mt-1">{track.featured_artist || user.name}</p>
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/5 text-white/50 border border-white/5">
+                                                {track.analysis?.primary_genre || 'Unknown'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="col-span-full py-12 text-center text-white/30 italic">
+                                    No tracks uploaded yet. Start by uploading your music!
+                                </div>
+                            )
+                        )}
                     </div>
                 </div>
 

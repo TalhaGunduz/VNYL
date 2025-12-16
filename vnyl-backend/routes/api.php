@@ -2,6 +2,7 @@
 
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\TrackController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -41,4 +42,13 @@ Route::get('/tracks', function () {
         ['id' => 7, 'title' => 'Soft Bloom', 'artist' => 'Juniper', 'gradient' => 'from-[#1e1a24] via-[#2a2230] to-[#352a3d]'],
         ['id' => 8, 'title' => 'Over Water', 'artist' => 'Kepler', 'gradient' => 'from-[#1a2420] via-[#223028] to-[#2a3d34]'],
     ]);
+});
+
+Route::get('/my-tracks', [TrackController::class, 'index']); // Public for now or handled inside with fallback auth logic
+Route::post('/analyze', [TrackController::class, 'analyze']);
+Route::post('/publish', [TrackController::class, 'publish']);
+
+Route::group(['middleware' => ['auth:sanctum']], function () {
+    Route::put('/tracks/{id}', [TrackController::class, 'update']);
+    Route::delete('/tracks/{id}', [TrackController::class, 'destroy']);
 });

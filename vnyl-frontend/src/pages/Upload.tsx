@@ -13,15 +13,32 @@ const GENRES = [
     "Turkish Art Music (Sanat Müziği)", "Fantezi"
 ].sort();
 
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 3000,
+    timerProgressBar: true,
+    didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer)
+        toast.addEventListener('mouseleave', Swal.resumeTimer)
+    }
+});
+
 const Upload = () => {
     const navigate = useNavigate();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
 
     // Genre State
+    const [analysisResult, setAnalysisResult] = useState<any>(null); // Store analysis data
+    const [tempPath, setTempPath] = useState<string | null>(null); // Store temp file path from backend
+
+    // Genre State
     const [genre, setGenre] = useState('');
     const [genreSearch, setGenreSearch] = useState('');
     const [isGenreOpen, setIsGenreOpen] = useState(false);
+    const [featuredArtist, setFeaturedArtist] = useState('');
 
     const [coverFile, setCoverFile] = useState<File | null>(null);
     const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -31,8 +48,9 @@ const Upload = () => {
 
     const coverInputRef = useRef<HTMLInputElement>(null);
     const audioInputRef = useRef<HTMLInputElement>(null);
-    const genreDropdownRef = useRef<HTMLDivElement>(null);
 
+    // Filter logic removed as Genre is now locked to auto-analysis validation
+    // But keeping it if we ever want to show it for info purposes or if requirement changes
     const filteredGenres = useMemo(() => {
         return GENRES.filter(g => g.toLowerCase().includes(genreSearch.toLowerCase()));
     }, [genreSearch]);
@@ -49,10 +67,115 @@ const Upload = () => {
         }
     };
 
+    // Auto-Upload & Analyze Logic (Step 1)
+    const analyzeAudio = async (file: File) => {
+        setIsUploading(true);
+        Swal.fire({
+            title: 'Analyzing...',
+            text: 'Extracting metadata and analyzing audio...',
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            didOpen: () => Swal.showLoading(),
+            background: '#1a1a1a',
+            color: '#fff',
+            toast: true,
+            position: 'bottom-end'
+        });
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('http://127.0.0.1:8000/api/analyze', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                if (data.analysis && data.analysis.error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Analysis Failed',
+                        text: data.analysis.error,
+                        footer: 'Please ensure FFmpeg is installed on the server.'
+                    });
+                    setIsUploading(false);
+                    return;
+                }
+
+                setAnalysisResult(data.analysis);
+                setTempPath(data.temp_path);
+
+                // Auto-fill form
+                if (data.metadata) {
+                    setTitle(data.metadata.title || file.name.replace(/\.[^/.]+$/, ""));
+                    setFeaturedArtist(data.metadata.artist || '');
+
+                    // Set Cover Art if available
+                    if (data.metadata.cover_art) {
+                        setCoverPreview(data.metadata.cover_art);
+                        // We need to handle this on submit. If no file is selected but preview exists, 
+                        // we should trust the backend to use the extracted one?
+                        // Or better: convert base64 to File object.
+                        fetch(data.metadata.cover_art)
+                            .then(res => res.blob())
+                            .then(blob => {
+                                const file = new File([blob], "cover_art.jpg", { type: "image/jpeg" });
+                                setCoverFile(file);
+                            });
+                    }
+                } else {
+                    setTitle(file.name.replace(/\.[^/.]+$/, ""));
+                }
+
+                // Show success
+                Toast.fire({
+                    icon: 'success',
+                    title: 'Analysis Complete'
+                });
+                if (data.analysis?.primary_genre) {
+                    setGenre(data.analysis.primary_genre);
+                }
+
+
+            } else {
+                let errorMessage = data.message || 'Analysis failed';
+                if (data.errors) {
+                    errorMessage = Object.values(data.errors).flat().join('\n');
+                }
+                throw new Error(errorMessage);
+            }
+        } catch (error: any) {
+            console.error(error);
+            setAudioFile(null); // Reset
+            Swal.fire({
+                icon: 'error',
+                title: 'Analysis Failed',
+                text: error.message || 'Check file size or format.',
+                background: '#1a1a1a',
+                color: '#fff'
+            });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     const handleAudioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            setAudioFile(e.target.files[0]);
+            analyzeAudio(e.target.files[0]);
         }
+    };
+
+    const handleReset = () => {
+        setAnalysisResult(null);
+        setTempPath(null);
+        setAudioFile(null);
+        setTitle('');
+        setFeaturedArtist('');
+        setGenre('');
+        if (audioInputRef.current) audioInputRef.current.value = '';
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -75,7 +198,7 @@ const Upload = () => {
         const audio = files.find(f => f.type.startsWith('audio/'));
         const image = files.find(f => f.type.startsWith('image/'));
 
-        if (audio) setAudioFile(audio);
+        if (audio && !tempPath) analyzeAudio(audio);
         if (image) {
             setCoverFile(image);
             const reader = new FileReader();
@@ -86,14 +209,15 @@ const Upload = () => {
         }
     };
 
+    // Final Publish Logic (Step 2)
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!title || !audioFile || !coverFile || !genre) {
+        if (!title || !tempPath || !genre) {
             Swal.fire({
                 icon: 'error',
                 title: 'Missing Info',
-                text: 'Please provide a title, genre, cover art, and an audio file.',
+                text: 'Please wait for analysis to complete.',
                 confirmButtonColor: '#d33'
             });
             return;
@@ -101,22 +225,64 @@ const Upload = () => {
 
         setIsUploading(true);
 
-        // Simulate upload delay
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        try {
+            const formData = new FormData();
+            formData.append('temp_path', tempPath);
+            formData.append('title', title);
+            formData.append('featured_artist', featuredArtist);
+            formData.append('genre', genre);
 
-        setIsUploading(false);
+            // Pass full analysis data back to be saved
+            // We need to stringify it if we're sending as FormData, 
+            // but Laravel validation 'required|array' might tricky with FormData directly if not careful.
+            // Better to append individual fields OR send as JSON request. 
+            // BUT we have a 'cover' file possibly. So FormData is must.
+            // Laravel handles arrays in FormData if appended like analysis[bpm]...
+            // OR simpler: send analysis data as separate fields or JSON string and decode in backend?
+            // Let's use array notation loop.
+            Object.entries(analysisResult).forEach(([key, value]) => {
+                if (typeof value === 'object' && value !== null) {
+                    formData.append(`analysis[${key}]`, JSON.stringify(value)); // For nested like genre_distribution
+                } else {
+                    formData.append(`analysis[${key}]`, String(value));
+                }
+            });
 
-        Swal.fire({
-            icon: 'success',
-            title: 'Track Published!',
-            text: 'Your music is now live.',
-            timer: 2000,
-            showConfirmButton: false,
-            background: '#1a1a1a',
-            color: '#fff'
-        }).then(() => {
-            navigate('/profile');
-        });
+            if (coverFile) {
+                formData.append('cover', coverFile);
+            }
+
+            const response = await fetch('http://127.0.0.1:8000/api/publish', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Published!',
+                    text: 'Your track is live.',
+                    background: '#1a1a1a',
+                    color: '#fff'
+                }).then(() => {
+                    navigate('/profile');
+                });
+            } else {
+                throw new Error(data.message || 'Publish failed');
+            }
+        } catch (error: any) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Save Failed',
+                text: error.message,
+                background: '#1a1a1a',
+                color: '#fff'
+            });
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     return (
@@ -168,21 +334,38 @@ const Upload = () => {
 
                         {/* Audio File Selection */}
                         <div
-                            onClick={() => audioInputRef.current?.click()}
-                            className={`p-6 rounded-2xl border border-white/5 bg-[var(--bg-card)] cursor-pointer hover:bg-white/5 transition-colors group ${audioFile ? 'border-green-500/30 bg-green-500/5' : ''}`}
+                            onClick={() => !tempPath && audioInputRef.current?.click()}
+                            className={`p-6 rounded-2xl border border-white/5 bg-[var(--bg-card)] cursor-pointer transition-colors group ${tempPath ? 'border-green-500/30 bg-green-500/5 cursor-default' : 'hover:bg-white/5'}`}
                         >
                             <div className="flex items-center gap-4">
-                                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${audioFile ? 'bg-green-500 text-white shadow-lg shadow-green-500/20' : 'bg-white/5 text-white/40 group-hover:text-white'}`}>
-                                    {audioFile ? <CheckCircle2 size={28} /> : <Music size={28} />}
+                                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${tempPath ? 'bg-green-500 text-white shadow-lg shadow-green-500/20' : 'bg-white/5 text-white/40 group-hover:text-white'}`}>
+                                    {tempPath ? <CheckCircle2 size={28} /> : (isUploading ? <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Music size={28} />)}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="font-bold text-white truncate text-lg">
-                                        {audioFile ? audioFile.name : 'Choose Audio File'}
+                                        {tempPath ? (title || audioFile?.name) : 'Choose Audio File'}
                                     </p>
                                     <p className="text-xs text-white/40 truncate font-medium">
-                                        {audioFile ? `${(audioFile.size / (1024 * 1024)).toFixed(2)} MB` : 'MP3, M4A, WAV supported'}
+                                        {tempPath ? 'Analyzed & Ready' : 'MP3, M4A, WAV supported'}
                                     </p>
+
+                                    {analysisResult && (
+                                        <div className="mt-2 text-xs text-green-400 font-mono">
+                                            {analysisResult.bpm} BPM • {analysisResult.primary_genre}
+                                        </div>
+                                    )}
                                 </div>
+
+                                {tempPath && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); handleReset(); }}
+                                        className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-full transition-colors"
+                                        title="Remove & Select Different"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                )}
                             </div>
                             <input
                                 type="file"
@@ -213,57 +396,11 @@ const Upload = () => {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Searchable Genre Select */}
-                                    <div className="space-y-2 relative" onClick={e => e.stopPropagation()}>
-                                        <label className="text-xs font-bold text-white/40 uppercase tracking-wider ml-1">Genre</label>
-                                        <div
-                                            className="relative cursor-pointer"
-                                            onClick={() => setIsGenreOpen(!isGenreOpen)}
-                                        >
-                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30">
-                                                {isGenreOpen ? <Search size={20} /> : <Music size={20} />}
-                                            </div>
-
-                                            {isGenreOpen ? (
-                                                <input
-                                                    type="text"
-                                                    autoFocus
-                                                    placeholder="Search genre..."
-                                                    className="w-full bg-black/40 border-0 rounded-t-xl px-5 py-4 pl-12 text-white font-medium focus:outline-none placeholder:text-white/40"
-                                                    value={genreSearch}
-                                                    onChange={(e) => setGenreSearch(e.target.value)}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                            ) : (
-                                                <div className={`w-full bg-black/40 border-0 rounded-xl px-5 py-4 pl-12 flex justify-between items-center transition-colors ${genre ? 'text-white font-medium' : 'text-white/40'}`}>
-                                                    <span>{genre || 'Select Genre'}</span>
-                                                    <ChevronDown size={18} className="text-white/30" />
-                                                </div>
-                                            )}
-
-                                            {isGenreOpen && (
-                                                <div className="absolute z-50 w-full bg-[#1e1e24] border border-white/5 border-t-0 rounded-b-xl max-h-60 overflow-y-auto shadow-2xl ring-1 ring-white/5">
-                                                    {filteredGenres.length > 0 ? (
-                                                        filteredGenres.map(g => (
-                                                            <div
-                                                                key={g}
-                                                                className="px-5 py-3 hover:bg-white/5 cursor-pointer text-sm text-white/80 transition-colors border-b border-white/5 last:border-0"
-                                                                onClick={() => {
-                                                                    setGenre(g);
-                                                                    setGenreSearch('');
-                                                                    setIsGenreOpen(false);
-                                                                }}
-                                                            >
-                                                                {g}
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        <div className="px-5 py-4 text-sm text-white/40 text-center">
-                                                            No genres found.
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
+                                    {/* Locked Genre Display */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-white/40 uppercase tracking-wider ml-1">Genre (AI Analysis)</label>
+                                        <div className="w-full bg-white/5 border border-white/5 rounded-xl px-5 py-4 text-white/60 font-medium cursor-not-allowed">
+                                            {genre || 'Pending Analysis...'}
                                         </div>
                                     </div>
 
@@ -275,6 +412,8 @@ const Upload = () => {
                                                 type="text"
                                                 className="w-full bg-black/40 border-0 rounded-xl pl-12 pr-5 py-4 text-white font-medium focus:ring-2 focus:ring-[var(--accent)] transition-all placeholder:text-white/20"
                                                 placeholder="Add collaborator (Optional)"
+                                                value={featuredArtist}
+                                                onChange={(e) => setFeaturedArtist(e.target.value)}
                                             />
                                         </div>
                                     </div>
@@ -304,13 +443,13 @@ const Upload = () => {
                             </button>
                             <button
                                 type="submit"
-                                disabled={isUploading}
-                                className={`px-10 py-4 rounded-xl text-sm font-black bg-[var(--accent)] text-white shadow-xl shadow-[var(--accent)]/20 transition-all flex items-center gap-3 ${isUploading ? 'opacity-70 cursor-not-allowed' : 'hover:scale-105 hover:brightness-110'}`}
+                                disabled={isUploading || !tempPath}
+                                className={`px-10 py-4 rounded-xl text-sm font-black bg-[var(--accent)] text-white shadow-xl shadow-[var(--accent)]/20 transition-all flex items-center gap-3 ${isUploading || !tempPath ? 'opacity-70 cursor-not-allowed' : 'hover:scale-105 hover:brightness-110'}`}
                             >
                                 {isUploading ? (
                                     <>
                                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        Uploading...
+                                        Processing...
                                     </>
                                 ) : (
                                     <>
