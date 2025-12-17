@@ -72,6 +72,11 @@ const ProfileMenu = () => {
                     <img
                         src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
                         alt="Profile"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`;
+                        }}
                         className="w-9 h-9 rounded-full object-cover border-2 border-transparent group-hover:border-white/20 transition-all"
                     />
                     {isVerified && (

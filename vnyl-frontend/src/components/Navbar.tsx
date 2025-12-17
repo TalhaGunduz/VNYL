@@ -37,9 +37,11 @@ const Navbar = () => {
           <Link className="text-white/60 hover:text-white transition-colors flex items-center gap-2" to="/charts">
             <BarChart3 size={16} /> <span className="hidden md:inline">Charts</span>
           </Link>
-          <Link className="text-white/60 hover:text-white transition-colors flex items-center gap-2" to="/upload">
-            <Upload size={16} /> <span className="hidden md:inline">Upload</span>
-          </Link>
+          {user && (user as any).verification_status === 'verified' && (
+            <Link className="text-white/60 hover:text-white transition-colors flex items-center gap-2" to="/upload">
+              <Upload size={16} /> <span className="hidden md:inline">Upload</span>
+            </Link>
+          )}
           {user && (
             <Link className="text-white/60 hover:text-white transition-colors flex items-center gap-2" to="/profile">
               <User size={16} /> <span className="hidden lg:inline">Profile</span>

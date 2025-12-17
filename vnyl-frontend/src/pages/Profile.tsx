@@ -234,6 +234,11 @@ const Profile = () => {
                             <img
                                 src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
                                 alt={user.name}
+                                referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`;
+                                }}
                                 className="w-full h-full rounded-full object-cover border-4 border-[#121212] shadow-2xl bg-[#1a1a1a]"
                             />
 
