@@ -159,7 +159,9 @@ class TrackController extends Controller
         }
 
         // Delete files
-        \Illuminate\Support\Facades\Storage::disk('public')->delete($track->file_path);
+        if ($track->file_path) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($track->file_path);
+        }
         if ($track->cover_path) {
             \Illuminate\Support\Facades\Storage::disk('public')->delete($track->cover_path);
         }
@@ -167,5 +169,82 @@ class TrackController extends Controller
         $track->delete();
 
         return response()->json(['status' => 'success', 'message' => 'Track deleted']);
+    }
+
+    /**
+     * Import a track from YouTube (Prompt 4)
+     */
+    public function importFromYouTube(Request $request, \App\Services\YouTubeService $youtube)
+    {
+        $request->validate([
+            'query' => 'required|string|min:2',
+        ]);
+
+        $query = $request->input('query');
+
+        // 1. Search YouTube
+        $results = $youtube->search($query, 1);
+
+        if (empty($results['items'])) {
+            return response()->json(['message' => 'No video found on YouTube'], 404);
+        }
+
+        $item = $results['items'][0];
+        $videoId = $item['id']['videoId'];
+        
+        // 2. Check if already exists
+        $existing = \App\Models\Track::where('youtube_video_id', $videoId)->first();
+        if ($existing) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Track already imported',
+                'track' => $existing
+            ]);
+        }
+
+        // 3. Get Details (Duration)
+        $details = $youtube->getVideoDetails($videoId);
+        $durationIso = $details['items'][0]['contentDetails']['duration'] ?? 'PT0M0S';
+        
+        // Convert ISO 8601 duration to seconds (Simple regex approximation)
+        // Or use DateInterval
+        try {
+            $interval = new \DateInterval($durationIso);
+            $durationSeconds = ($interval->h * 3600) + ($interval->i * 60) + $interval->s;
+        } catch (\Exception $e) {
+            $durationSeconds = 0;
+        }
+
+        // 4. Save to DB
+        // Determine Artist and Title from video title (often "Artist - Title")
+        $videoTitle = $item['snippet']['title'];
+        $artist = $item['snippet']['channelTitle'];
+        $title = $videoTitle;
+
+        // Simple heuristic: if "-" exists, split it
+        if (strpos($videoTitle, '-') !== false) {
+            $parts = explode('-', $videoTitle, 2);
+            $artist = trim($parts[0]);
+            $title = trim($parts[1]);
+        }
+
+        $track = \App\Models\Track::create([
+            'user_id' => $request->user() ? $request->user()->id : 1, // Fallback for dev
+            'title' => $title,
+            'featured_artist' => $artist, // Storing "Artist" in featured_artist for now based on Prompt 3 mapping
+                                         // Prompt 3 asked for "artist" field, but our DB has "featured_artist" or relies on User relationships.
+                                         // I will use `featured_artist` to store the YouTube Channel/Artist name for now as existing tracks table relies on User ownership.
+                                         // Ideally, we should have an `artist_name` string column if it's not our platform user.
+            'youtube_video_id' => $videoId,
+            'cover_image' => $item['snippet']['thumbnails']['high']['url'] ?? $item['snippet']['thumbnails']['medium']['url'],
+            'duration' => $durationSeconds,
+            'status' => 'published',
+            'is_public' => true
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'track' => $track
+        ]);
     }
 }

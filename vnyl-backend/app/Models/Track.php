@@ -6,7 +6,23 @@ use Illuminate\Database\Eloquent\Model;
 
 class Track extends Model
 {
-    protected $fillable = ['user_id', 'title', 'file_path', 'cover_path', 'status', 'featured_artist'];
+    protected $fillable = [
+        'user_id', 
+        'title', 
+        'file_path', 
+        'cover_path', 
+        'status', 
+        'featured_artist',
+        'youtube_video_id',
+        'cover_image',
+        'duration',
+        'is_public'
+    ];
+    
+    protected $casts = [
+        'is_public' => 'boolean',
+        'duration' => 'integer'
+    ];
 
     public function analysis()
     {

@@ -10,7 +10,12 @@ use App\Http\Controllers\LikeController;
 use App\Http\Controllers\PlaylistController;
 
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+// YouTube Integration Routes
+Route::post('/youtube/search', [\App\Http\Controllers\YouTubeController::class, 'search']);
+Route::post('/youtube/import', [\App\Http\Controllers\YouTubeController::class, 'import']);
+
+// Standard Routes
+Route::post('/login', [\App\Http\Controllers\AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
