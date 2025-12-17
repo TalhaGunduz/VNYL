@@ -11,6 +11,8 @@ import PlaylistDetail from './pages/PlaylistDetail'; // Import
 import BecomeArtist from './pages/BecomeArtist'; // Added import for BecomeArtist
 import ArtistPanel from './pages/ArtistPanel';
 import ArtistProfileSetup from './pages/ArtistProfileSetup';
+import Hub from './pages/Hub';
+import ArtistPage from './pages/ArtistPage';
 
 import { PlayerProvider } from './context/PlayerContext';
 import MusicPlayer from './components/MusicPlayer';
@@ -32,10 +34,13 @@ export default function App() {
           <Route path="/become-artist" element={<BecomeArtist />} />
           <Route path="/artist-panel" element={<ArtistPanel />} />
           <Route path="/artist/complete-profile" element={<ArtistProfileSetup />} />
+          <Route path="/hub" element={<Hub />} />
+          <Route path="/artist/:slug" element={<ArtistPage />} />
         </Routes>
         <MusicPlayer />
       </PlayerProvider>
     </Router>
   );
 }
+
 

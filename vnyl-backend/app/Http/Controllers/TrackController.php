@@ -75,6 +75,25 @@ class TrackController extends Controller
         ]);
     }
 
+    /**
+     * Get random tracks for Music Hub Discovery
+     */
+    public function random(Request $request)
+    {
+        $limit = $request->input('limit', 12);
+        
+        // Fetch random public tracks. Prefer ones with covers.
+        $tracks = \App\Models\Track::where('is_public', true)
+                    ->inRandomOrder()
+                    ->take($limit)
+                    ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'tracks' => $tracks
+        ]);
+    }
+
     public function publish(Request $request)
     {
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [

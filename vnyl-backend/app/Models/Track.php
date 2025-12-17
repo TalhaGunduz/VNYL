@@ -16,7 +16,8 @@ class Track extends Model
         'youtube_video_id',
         'cover_image',
         'duration',
-        'is_public'
+        'is_public',
+        'artist_id'
     ];
     
     protected $casts = [
@@ -34,6 +35,11 @@ class Track extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function artist()
+    {
+        return $this->belongsTo(Artist::class);
     }
 
     public function likedBy()

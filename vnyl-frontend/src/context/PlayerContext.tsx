@@ -6,7 +6,9 @@ interface Track {
     title: string;
     description?: string;
     cover_path?: string;
-    file_path: string;
+    file_path: string | null;
+    youtube_video_id?: string | null;
+    cover_image?: string | null;
     featured_artist?: string;
     analysis?: {
         bpm?: number;
@@ -18,6 +20,11 @@ interface Track {
     };
     is_liked?: boolean;
     likes_count?: number;
+    artist?: {
+        id: number;
+        slug: string;
+        stage_name: string;
+    };
 }
 
 interface PlayerContextType {
@@ -34,6 +41,7 @@ interface PlayerContextType {
     setVolume: (vol: number) => void;
     isVisible: boolean;
     toggleLike: () => void;
+    setCurrentTime: (time: number) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -107,6 +115,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Helper to play a specific track
     const playTrack = (track: Track) => {
+        // If it's a YouTube track, just set state and let the UI component handle the player
+        if (track.youtube_video_id) {
+            if (audioRef.current) {
+                audioRef.current.pause(); // Stop any existing audio
+                audioRef.current.currentTime = 0;
+            }
+            setCurrentTrack(track);
+            setIsPlaying(true);
+            return;
+        }
+
+        // Standard Audio File Logic
         if (!audioRef.current) return;
         const audio = audioRef.current;
 
@@ -115,7 +135,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return;
         }
 
-        // New track
+        // New local track
         audio.src = `http://127.0.0.1:8000/storage/${track.file_path}`;
         audio.volume = volume;
         audio.play().then(() => {
@@ -127,6 +147,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Helper to toggle play/pause
     const togglePlay = () => {
+        // If YouTube, just toggle state (MusicPlayer will react)
+        if (currentTrack?.youtube_video_id) {
+            setIsPlaying(!isPlaying);
+            return;
+        }
+
         if (!audioRef.current || !currentTrack) return;
 
         if (isPlaying) {
@@ -188,7 +214,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             seek,
             setVolume: handleVolumeChange,
             isVisible,
-            toggleLike
+            toggleLike,
+            setCurrentTime // Export this
         }}>
             {children}
         </PlayerContext.Provider>

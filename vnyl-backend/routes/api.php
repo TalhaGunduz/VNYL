@@ -19,11 +19,36 @@ Route::post('/login', [\App\Http\Controllers\AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
-        return $request->user()->load('artist');
+        return $request->user();
     });
-    Route::match(['put', 'post'], '/update-profile', [AuthController::class, 'updateProfile']);
-    Route::delete('/delete-account', [AuthController::class, 'deleteAccount']);
+
+    Route::post('/logout', [\App\Http\Controllers\AuthController::class, 'logout']);
+    
+    // Profile Management
+    Route::put('/user/profile', [\App\Http\Controllers\AuthController::class, 'updateProfile']);
+    Route::delete('/user/account', [\App\Http\Controllers\AuthController::class, 'deleteAccount']);
+
+    // Track Management
+    Route::get('/tracks', [\App\Http\Controllers\TrackController::class, 'index']); // My Tracks
+    Route::post('/tracks', [\App\Http\Controllers\TrackController::class, 'publish']); // Publish new
+    Route::delete('/tracks/{id}', [\App\Http\Controllers\TrackController::class, 'destroy']);
+    
+    // Likes
+    Route::post('/tracks/{id}/like', [\App\Http\Controllers\LikeController::class, 'toggleLike']);
+    Route::get('/my-likes', [\App\Http\Controllers\LikeController::class, 'myLikes']);
+
+    // Playlists
+    Route::apiResource('playlists', PlaylistController::class);
+    Route::post('/playlists/{id}/tracks', [PlaylistController::class, 'addTrack']);
+    Route::delete('/playlists/{id}/tracks', [PlaylistController::class, 'removeTrack']);
 });
+
+// Public Track Routes
+Route::get('/public-tracks', [\App\Http\Controllers\TrackController::class, 'publicIndex']);
+Route::get('/users/{id}/tracks', [\App\Http\Controllers\TrackController::class, 'userTracks']);
+Route::get('/search', [\App\Http\Controllers\TrackController::class, 'search']); // DB Search
+Route::get('/tracks/random', [\App\Http\Controllers\TrackController::class, 'random']); 
+Route::get('/hub', [\App\Http\Controllers\HubController::class, 'index']); // New Curated Hub Logic
 
 // Artist Flow
 Route::post('/auth/send-verification', [\App\Http\Controllers\ArtistController::class, 'sendVerification']);
@@ -32,6 +57,11 @@ Route::post('/artist/verify-and-upgrade', [\App\Http\Controllers\ArtistControlle
 Route::match(['put', 'post'], '/artist/profile', [\App\Http\Controllers\ArtistController::class, 'updateProfile'])->middleware('auth:sanctum');
 Route::get('/artist/stats', [\App\Http\Controllers\ArtistController::class, 'getStats']);
 
+// Public Artist Directory (Hub & Artist Page)
+Route::get('/artists', [\App\Http\Controllers\ArtistController::class, 'index']);
+Route::get('/artists/{slug}', [\App\Http\Controllers\ArtistController::class, 'show']);
+Route::get('/artists/{slug}/tracks', [\App\Http\Controllers\ArtistController::class, 'tracks']);
+
 Route::middleware(['web'])->group(function () {
     Route::get('/auth/google', [AuthController::class, 'redirectToGoogle']);
     Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
@@ -39,18 +69,7 @@ Route::middleware(['web'])->group(function () {
     Route::get('/auth/facebook/callback', [AuthController::class, 'handleFacebookCallback']);
 });
 
-Route::get('/tracks', function () {
-    return response()->json([
-        ['id' => 1, 'title' => 'Neon Dreams', 'artist' => 'Luna Waves', 'gradient' => 'from-[#1f1f1f] via-[#2b2b2b] to-[#3a3a3a]'],
-        ['id' => 2, 'title' => 'Midnight Echoes', 'artist' => 'Caspian Vale', 'gradient' => 'from-[#2a1f14] via-[#3b2a1f] to-[#4b372a]'],
-        ['id' => 3, 'title' => 'Quiet Streets', 'artist' => 'Vesper', 'gradient' => 'from-[#1a202c] via-[#222b3a] to-[#2d3a4a]'],
-        ['id' => 4, 'title' => 'Static Sun', 'artist' => 'Amberline', 'gradient' => 'from-[#241a1a] via-[#2f2222] to-[#3a2b2b]'],
-        ['id' => 5, 'title' => 'Glass Birds', 'artist' => 'Mira', 'gradient' => 'from-[#1a1f24] via-[#222a30] to-[#2a3540]'],
-        ['id' => 6, 'title' => 'Signal Fire', 'artist' => 'Kite Club', 'gradient' => 'from-[#1b1b1b] via-[#282828] to-[#353535]'],
-        ['id' => 7, 'title' => 'Soft Bloom', 'artist' => 'Juniper', 'gradient' => 'from-[#1e1a24] via-[#2a2230] to-[#352a3d]'],
-        ['id' => 8, 'title' => 'Over Water', 'artist' => 'Kepler', 'gradient' => 'from-[#1a2420] via-[#223028] to-[#2a3d34]'],
-    ]);
-});
+
 
 Route::get('/my-tracks', [TrackController::class, 'index']); // Public for now or handled inside with fallback auth logic
 Route::post('/analyze', [TrackController::class, 'analyze']);

@@ -10,38 +10,24 @@ class Artist extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
-        'avatar',
-        'is_verified',
-        'stage_name',
-        'artist_bio',
-        'bio', // Legacy
-        'primary_genre',
-        'secondary_genres',
-        'career_status',
-        'location_city',
-        'location_country',
-        'instagram_handle', // Legacy
-        'spotify_id',       // Legacy
-        'social_instagram',
-        'social_spotify',
-        'social_youtube',
-        'social_soundcloud',
-        'social_apple',
+        'stage_name', // Mapped to 'name' logically
+        'slug',
+        'avatar', // Mapped from 'image_url'
+        'artist_bio', // Mapped from 'bio'
+        'user_id'
     ];
 
-    protected $casts = [
-        'is_verified' => 'boolean',
-        'secondary_genres' => 'array',
-    ];
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
+    // Accessors for cleaner API usage
+    public function getNameAttribute() {
+        return $this->stage_name;
     }
 
-    public function verificationRequests()
+    public function getImageUrlAttribute() {
+        return $this->avatar;
+    }
+
+    public function tracks()
     {
-        return $this->hasMany(ArtistVerificationRequest::class);
+        return $this->hasMany(Track::class);
     }
 }
