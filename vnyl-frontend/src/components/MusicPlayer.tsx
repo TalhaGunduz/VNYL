@@ -11,6 +11,7 @@ const MusicPlayer: React.FC = () => {
         isExpanded,
         currentTime,
         duration,
+        setDuration,
         volume,
         togglePlay,
         setIsExpanded,
@@ -19,7 +20,7 @@ const MusicPlayer: React.FC = () => {
         isVisible,
         toggleLike,
         setCurrentTime,
-        playTrack // Added logic to play from queue
+        playTrack
     } = usePlayer();
 
     const navigate = useNavigate();
@@ -78,14 +79,37 @@ const MusicPlayer: React.FC = () => {
     // --- YouTube API Handlers ---
     const onReady = (event: any) => {
         playerRef.current = event.target;
-        playerRef.current.setVolume(volume * 100);
-        if (isPlaying) {
+        // Safely set volume
+        if (playerRef.current && typeof playerRef.current.setVolume === 'function') {
+            playerRef.current.setVolume(volume * 100);
+        }
+
+        // Auto-play if state says so (important for track changes)
+        if (isPlaying && playerRef.current && typeof playerRef.current.playVideo === 'function') {
             playerRef.current.playVideo();
+        }
+
+        // FETCH DURATION FALLBACK
+        if (playerRef.current && typeof playerRef.current.getDuration === 'function') {
+            const ytDuration = playerRef.current.getDuration();
+            // If track has no duration or 0, update context
+            if ((!currentTrack?.duration || currentTrack.duration === 0) && ytDuration > 0) {
+                setDuration(ytDuration);
+            }
         }
     };
 
     const onStateChange = (event: any) => {
         // 0 = Ended, 1 = Playing, 2 = Paused
+        if (event.data === 1) { // Playing
+            // Try fetching duration again when playing starts (sometimes it's 0 on ready)
+            if (playerRef.current && typeof playerRef.current.getDuration === 'function') {
+                const ytDuration = playerRef.current.getDuration();
+                if ((!currentTrack?.duration || currentTrack?.duration === 0) && ytDuration > 0) {
+                    setDuration(ytDuration);
+                }
+            }
+        }
         if (event.data === 0) {
             togglePlay(); // Stop playing when ended
         }
@@ -93,11 +117,15 @@ const MusicPlayer: React.FC = () => {
 
     // Sync React State -> YouTube Player
     useEffect(() => {
-        if (currentTrack?.youtube_video_id && playerRef.current) {
-            if (isPlaying) {
-                playerRef.current.playVideo();
-            } else {
-                playerRef.current.pauseVideo();
+        if (currentTrack?.youtube_video_id && playerRef.current && typeof playerRef.current.playVideo === 'function') {
+            try {
+                if (isPlaying) {
+                    playerRef.current.playVideo();
+                } else {
+                    playerRef.current.pauseVideo();
+                }
+            } catch (e) {
+                console.warn("YouTube Player error during sync", e);
             }
         }
     }, [isPlaying, currentTrack]);

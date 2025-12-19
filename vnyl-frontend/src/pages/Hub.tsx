@@ -1,8 +1,9 @@
 
 import { useEffect, useState } from 'react';
-import { Play, Heart, MoreVertical, Compass, Music } from 'lucide-react';
+import { Play, Heart, MoreVertical, Compass, Music, ListPlus, ListMusic, User, Share2 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { useNavigate } from 'react-router-dom';
+import AddToPlaylistModal from '../components/AddToPlaylistModal';
 
 const Hub = () => {
     const [tracks, setTracks] = useState<any[]>([]);
@@ -11,11 +12,14 @@ const Hub = () => {
     const { playTrack } = usePlayer();
     const navigate = useNavigate();
 
+    // Add to Playlist Modal State
+    const [addToPlaylistTrackId, setAddToPlaylistTrackId] = useState<number | null>(null);
+
     // Sections configuration
     const sections = [
-        { title: "Sana Özel Seçkiler", subtitle: "VNYL KEŞİF" },
-        { title: "Haftanın Trendleri", subtitle: "SOSYAL" },
-        { title: "Ruh Halini Yansıt", subtitle: "MODLAR" },
+        { title: "Curated For You", subtitle: "VNYL PICKS" },
+        { title: "Trending This Week", subtitle: "SOCIAL" },
+        { title: "Mood & Vibe", subtitle: "MOODS" },
     ];
 
     useEffect(() => {
@@ -23,10 +27,15 @@ const Hub = () => {
             setLoading(true);
             try {
                 // Fetch Tracks
-                const res = await fetch('http://127.0.0.1:8000/api/hub');
+                const res = await fetch('http://127.0.0.1:8000/api/hub', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}` // Ensure auth for like status
+                    }
+                });
                 const data = await res.json();
                 if (data.status === 'success') {
-                    setTracks(data.tracks);
+                    // Shuffle tracks once on load
+                    setTracks(data.tracks.sort(() => 0.5 - Math.random()));
                 }
 
                 // Fetch Artists
@@ -45,10 +54,48 @@ const Hub = () => {
         fetchData();
     }, []);
 
-    const getSectionTracks = (seed: number) => {
+    const handleToggleLike = async (trackId: number) => {
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/api/tracks/${trackId}/like`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                // Optimistic Update
+                setTracks(prev => prev.map(t =>
+                    t.id === trackId ? { ...t, is_liked: data.liked, likes_count: data.total_likes } : t
+                ));
+            }
+        } catch (error) {
+            console.error("Error toggling like", error);
+        }
+    };
+
+    const handleAddToPlaylist = (trackId: number) => {
+        setAddToPlaylistTrackId(trackId);
+    };
+
+    const getSectionTracks = (index: number) => {
         if (!tracks.length) return [];
-        const start = (seed * 6) % tracks.length;
-        return tracks.slice(start, start + 5);
+
+        // Unique content for each section (3 sections * 15 tracks = 45 needed)
+        // If we don't have enough, we'll just wrap around, but standard offset ensures variety
+        const itemsPerSection = 15;
+        const start = (index * itemsPerSection) % tracks.length;
+
+        let result = tracks.slice(start, start + itemsPerSection);
+
+        // If we hit the end, wrap around to start
+        if (result.length < itemsPerSection) {
+            result = [...result, ...tracks.slice(0, itemsPerSection - result.length)];
+        }
+
+        return result;
     };
 
     if (loading) return (
@@ -64,13 +111,13 @@ const Hub = () => {
             <header className="pt-12 pb-8 px-6 md:px-12 border-b border-white/5 bg-gradient-to-b from-[#121212] to-[#0a0a0a]">
                 <div className="flex items-center gap-3 mb-2 opacity-60">
                     <Compass size={18} className="text-[var(--accent)]" />
-                    <span className="text-xs font-bold tracking-[0.2em] uppercase">Müzik Merkezi</span>
+                    <span className="text-xs font-bold tracking-[0.2em] uppercase">Music Hub</span>
                 </div>
                 <h1 className="text-4xl md:text-5xl font-black tracking-tight mt-2">
-                    Müzik <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent)] to-purple-500">Evrenini</span> Keşfet.
+                    Discover the <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent)] to-purple-500">Music Universe</span>.
                 </h1>
                 <p className="text-white/40 mt-4 max-w-lg text-lg leading-relaxed">
-                    Sıradan listelerden sıkıldın mı? VNYL'nin yapay zeka destekli kürasyonu ile daha derine in.
+                    Tired of ordinary playlists? Dive deeper with VNYL's AI-powered curation.
                 </p>
             </header>
 
@@ -81,7 +128,7 @@ const Hub = () => {
                     <div className="flex items-center gap-4 mb-8">
                         <div className="h-8 w-1 bg-[var(--accent)] rounded-full" />
                         <div>
-                            <h2 className="text-2xl font-bold">Öne Çıkan Sanatçılar</h2>
+                            <h2 className="text-2xl font-bold">Featured Artists</h2>
                             <p className="text-white/30 text-xs font-medium tracking-wider uppercase mt-1">CURATED BY VNYL</p>
                         </div>
                     </div>
@@ -107,35 +154,98 @@ const Hub = () => {
                     </div >
                 </section >
 
-                {
-                    sections.map((section, idx) => (
-                        <section key={idx} className="relative">
-                            {/* Section Title */}
-                            <div className="flex items-center gap-4 mb-8">
-                                <div className="h-8 w-1 bg-[var(--accent)] rounded-full" />
-                                <div>
-                                    <h2 className="text-2xl font-bold">{section.title}</h2>
-                                    <p className="text-white/30 text-xs font-medium tracking-wider uppercase mt-1">{section.subtitle}</p>
-                                </div>
-                            </div>
-
-                            {/* Custom Card Layout (Flex wrap for responsive) */}
-                            <div className="flex flex-wrap gap-6">
-                                {getSectionTracks(idx).map((track: any) => (
-                                    <TrackCard key={track.id} track={track} onClick={() => playTrack(track)} />
-                                ))}
-                            </div>
-                        </section>
-                    ))
-                }
+                {sections.map((section, idx) => (
+                    <SectionCarousel
+                        key={idx}
+                        title={section.title}
+                        subtitle={section.subtitle}
+                        tracks={getSectionTracks(idx)}
+                        onPlay={playTrack}
+                        onLike={handleToggleLike}
+                        onAddToPlaylist={handleAddToPlaylist}
+                    />
+                ))}
             </div >
+
+            {/* Add to Playlist Modal */}
+            <AddToPlaylistModal
+                trackId={addToPlaylistTrackId}
+                onClose={() => setAddToPlaylistTrackId(null)}
+            />
         </div >
+    );
+};
+
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useRef } from 'react';
+
+const SectionCarousel = ({ title, subtitle, tracks, onPlay, onLike, onAddToPlaylist }: any) => {
+    const scrollContainer = useRef<HTMLDivElement>(null);
+
+    const scroll = (direction: 'left' | 'right') => {
+        if (scrollContainer.current) {
+            const scrollAmount = direction === 'left' ? -600 : 600;
+            scrollContainer.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+        }
+    };
+
+    return (
+        <section className="relative group/section">
+            {/* Header */}
+            <div className="flex items-end justify-between mb-8">
+                <div className="flex items-center gap-4">
+                    <div className="h-8 w-1 bg-[var(--accent)] rounded-full" />
+                    <div>
+                        <h2 className="text-2xl font-bold">{title}</h2>
+                        <p className="text-white/30 text-xs font-medium tracking-wider uppercase mt-1">{subtitle}</p>
+                    </div>
+                </div>
+
+                {/* Controls */}
+                <div className="flex items-center gap-4 opacity-0 group-hover/section:opacity-100 transition-opacity">
+                    <button className="px-4 py-2 rounded-full border border-white/10 hover:border-white/30 text-sm font-bold text-white/70 hover:text-white transition-all">
+                        Diğer
+                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => scroll('left')}
+                            className="w-10 h-10 rounded-full bg-white/5 border border-white/5 flex items-center justify-center hover:bg-white/10 hover:border-white/20 transition-all disabled:opacity-30"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
+                        <button
+                            onClick={() => scroll('right')}
+                            className="w-10 h-10 rounded-full bg-white/5 border border-white/5 flex items-center justify-center hover:bg-white/10 hover:border-white/20 transition-all"
+                        >
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Carousel */}
+            <div
+                ref={scrollContainer}
+                className="flex gap-6 overflow-x-auto scrollbar-hide pb-4 -mx-4 px-4 scroll-smooth"
+            >
+                {tracks.map((track: any) => (
+                    <div key={track.id} className="flex-shrink-0">
+                        <TrackCard
+                            track={track}
+                            onClick={() => onPlay(track)}
+                            onLike={() => onLike(track.id)}
+                            onAddToPlaylist={() => onAddToPlaylist(track.id)}
+                        />
+                    </div>
+                ))}
+            </div>
+        </section>
     );
 };
 
 
 
-const TrackCard = ({ track, onClick }: { track: any, onClick: () => void }) => {
+const TrackCard = ({ track, onClick, onLike, onAddToPlaylist }: { track: any, onClick: () => void, onLike: () => void, onAddToPlaylist: () => void }) => {
     const [imgError, setImgError] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const navigate = useNavigate();
@@ -156,7 +266,6 @@ const TrackCard = ({ track, onClick }: { track: any, onClick: () => void }) => {
         if (track.artist?.slug) {
             navigate(`/artist/${track.artist.slug}`);
         } else {
-            // Fallback: search? or just do nothing for unlinked tracks
             console.warn("No artist linked for this track");
         }
     };
@@ -190,17 +299,23 @@ const TrackCard = ({ track, onClick }: { track: any, onClick: () => void }) => {
                     </div>
                 )}
 
-                {/* Heart Icon Overlay */}
-                <button className="absolute top-3 right-3 w-8 h-8 bg-black/30 backdrop-blur-md rounded-full flex items-center justify-center text-white/50 hover:text-red-500 hover:bg-black/50 transition-all z-10">
-                    <Heart size={14} fill={track.is_liked ? "currentColor" : "none"} />
-                </button>
-
-                {/* Play Button */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 z-10">
-                    <div className="w-12 h-12 bg-[var(--accent)] text-black rounded-full flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100">
+                {/* Play Button - Lower z-index than actions */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 pointer-events-none">
+                    <div className="w-12 h-12 bg-[var(--accent)] text-black rounded-full flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 pointer-events-auto">
                         <Play fill="currentColor" size={20} className="ml-0.5" />
                     </div>
                 </div>
+
+                {/* Heart Icon Overlay - Higher z-index to be clickable */}
+                <button
+                    className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all z-20 ${track.is_liked ? 'bg-red-500/20 text-red-500 backdrop-blur-md' : 'bg-black/30 text-white/50 hover:text-white backdrop-blur-md hover:bg-black/50'}`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onLike();
+                    }}
+                >
+                    <Heart size={14} fill={track.is_liked ? "currentColor" : "none"} />
+                </button>
             </div>
 
             {/* Card Metadata */}
@@ -213,7 +328,7 @@ const TrackCard = ({ track, onClick }: { track: any, onClick: () => void }) => {
                     {/* Context Menu Trigger */}
                     <div className="relative">
                         <button
-                            className="text-white/30 hover:text-white transition-colors p-1"
+                            className={`text-white/30 hover:text-white transition-colors p-1 ${showMenu ? 'text-white' : ''}`}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setShowMenu(!showMenu);
@@ -224,15 +339,51 @@ const TrackCard = ({ track, onClick }: { track: any, onClick: () => void }) => {
 
                         {/* Dropdown Menu */}
                         {showMenu && (
-                            <div className="absolute right-0 top-full mt-2 w-48 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute right-0 top-full mt-2 w-52 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
                                 <button
-                                    className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-2"
-                                    onClick={handleArtistClick}
+                                    className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-3 transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onLike();
+                                        setShowMenu(false);
+                                    }}
                                 >
-                                    <Music size={14} />
-                                    Sanatçıya Git
+                                    <Heart size={16} className={track.is_liked ? "text-red-500" : ""} fill={track.is_liked ? "currentColor" : "none"} />
+                                    {track.is_liked ? "Remove from Queue" : "Like Song"}
                                 </button>
-                                {/* Future: Add to Playlist etc. */}
+                                <button
+                                    className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-3 transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onAddToPlaylist();
+                                        setShowMenu(false);
+                                    }}
+                                >
+                                    <ListMusic size={16} />
+                                    Add to Playlist
+                                </button>
+                                <div className="h-px bg-white/5 my-1" />
+                                <button
+                                    className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-3 transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleArtistClick(e);
+                                    }}
+                                >
+                                    <User size={16} />
+                                    Go to Artist
+                                </button>
+                                <button
+                                    className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-3 transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Share logic
+                                        setShowMenu(false);
+                                    }}
+                                >
+                                    <Share2 size={16} />
+                                    Share
+                                </button>
                             </div>
                         )}
                     </div>

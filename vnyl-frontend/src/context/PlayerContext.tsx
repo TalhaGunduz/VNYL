@@ -43,6 +43,7 @@ interface PlayerContextType {
     isVisible: boolean;
     toggleLike: () => void;
     setCurrentTime: (time: number) => void;
+    setDuration: (duration: number) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -216,7 +217,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setVolume: handleVolumeChange,
             isVisible,
             toggleLike,
-            setCurrentTime // Export this
+            setCurrentTime, // Export this
+            setDuration // Export this
         }}>
             {children}
         </PlayerContext.Provider>

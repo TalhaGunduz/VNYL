@@ -303,7 +303,7 @@ const Profile = () => {
                                     )}
                                     <div className="flex items-center gap-2 text-white/50 text-sm">
                                         <Calendar size={16} className="text-[var(--accent)]" />
-                                        Joined {user.joinedAt || user.joined_at || user.created_at ? new Date(user.joinedAt || user.joined_at || user.created_at).toLocaleDateString() : 'Recently'}
+                                        Joined {user.joinedAt || user.joined_at || user.created_at ? new Date((user.joinedAt || user.joined_at || user.created_at).replace(' ', 'T')).toLocaleDateString() : 'Recently'}
                                     </div>
                                 </div>
                             </div>
@@ -375,13 +375,16 @@ const Profile = () => {
                             likedTracks.length > 0 ? (
                                 <div className="col-span-1 md:col-span-2 lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6">
                                     {likedTracks.map((track: any) => (
-                                        <div key={track.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 hover:bg-white/10 transition-all group hover:-translate-y-2 hover:shadow-2xl hover:shadow-[var(--accent)]/10 cursor-pointer">
+                                        <div
+                                            key={track.id}
+                                            className="bg-white/5 border border-white/5 rounded-2xl p-4 hover:bg-white/10 transition-all group hover:-translate-y-2 hover:shadow-2xl hover:shadow-[var(--accent)]/10 cursor-pointer"
+                                            onClick={() => playTrack(track)}
+                                        >
                                             <div
                                                 className="aspect-square bg-white/5 rounded-xl mb-4 relative overflow-hidden shadow-lg group-hover:shadow-2xl group-hover:shadow-black/50 transition-all transform-gpu"
-                                                onClick={() => playTrack(track)}
                                             >
-                                                {track.cover_path ? (
-                                                    <img src={`http://127.0.0.1:8000/storage/${track.cover_path}`} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                                                {track.cover_image || track.cover_path ? (
+                                                    <img src={track.cover_image || `http://127.0.0.1:8000/storage/${track.cover_path}`} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
                                                         <Music size={48} className="text-white/20" />
@@ -391,9 +394,9 @@ const Profile = () => {
                                                 {/* Gradient Overlay */}
                                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
 
-                                                {/* Play Button */}
-                                                <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${currentTrack?.id === track.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100'}`}>
-                                                    <div className="w-14 h-14 bg-white/10 backdrop-blur-md border border-white/20 rounded-[18px] flex items-center justify-center shadow-2xl text-white hover:bg-white/20 hover:scale-105 transition-all cursor-pointer">
+                                                {/* Play Button - Lower Z, pointer-events-none container */}
+                                                <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 z-10 pointer-events-none ${currentTrack?.id === track.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100'}`}>
+                                                    <div className="w-14 h-14 bg-white/10 backdrop-blur-md border border-white/20 rounded-[18px] flex items-center justify-center shadow-2xl text-white hover:bg-white/20 hover:scale-105 transition-all cursor-pointer pointer-events-auto">
                                                         {currentTrack?.id === track.id && isPlaying ? (
                                                             <Pause size={22} fill="white" className="drop-shadow-lg" />
                                                         ) : (
@@ -402,9 +405,9 @@ const Profile = () => {
                                                     </div>
                                                 </div>
 
-                                                {/* Like Button (Top Right) */}
+                                                {/* Like Button (Top Right) - Higher Z */}
                                                 <button
-                                                    className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all duration-200 transform hover:scale-110 z-10 ${track.is_liked ? 'bg-red-500/20 text-red-500' : 'bg-black/20 text-white/70 hover:bg-black/40 hover:text-white'}`}
+                                                    className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all duration-200 transform hover:scale-110 z-20 ${track.is_liked ? 'bg-red-500/20 text-red-500' : 'bg-black/20 text-white/70 hover:bg-black/40 hover:text-white'}`}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleToggleLike(track.id);
@@ -414,7 +417,7 @@ const Profile = () => {
                                                 </button>
 
                                                 {/* Duration (Bottom Right) */}
-                                                <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity delay-75">
+                                                <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity delay-75 pointer-events-none">
                                                     <span className="text-xs font-medium text-white/90 tracking-wide drop-shadow-md font-mono">
                                                         {track.analysis?.duration ? new Date(track.analysis.duration * 1000).toISOString().substr(14, 5) : (track.duration_formatted || '03:42')}
                                                     </span>
@@ -513,13 +516,16 @@ const Profile = () => {
                                 <div className="col-span-1 md:col-span-2 lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6">
                                     {tracks.length > 0 ? (
                                         tracks.map((track: any) => (
-                                            <div key={track.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 hover:bg-white/10 transition-all group hover:-translate-y-2 hover:shadow-2xl hover:shadow-[var(--accent)]/10 cursor-pointer">
+                                            <div
+                                                key={track.id}
+                                                className="bg-white/5 border border-white/5 rounded-2xl p-4 hover:bg-white/10 transition-all group hover:-translate-y-2 hover:shadow-2xl hover:shadow-[var(--accent)]/10 cursor-pointer"
+                                                onClick={() => playTrack(track)}
+                                            >
                                                 <div
                                                     className="aspect-square bg-white/5 rounded-xl mb-4 relative overflow-hidden shadow-lg group-hover:shadow-2xl group-hover:shadow-black/50 transition-all transform-gpu"
-                                                    onClick={() => playTrack(track)}
                                                 >
-                                                    {track.cover_path ? (
-                                                        <img src={`http://127.0.0.1:8000/storage/${track.cover_path}`} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                                                    {track.cover_image || track.cover_path ? (
+                                                        <img src={track.cover_image || `http://127.0.0.1:8000/storage/${track.cover_path}`} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
                                                             <Music size={48} className="text-white/20" />
@@ -530,8 +536,8 @@ const Profile = () => {
                                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
 
                                                     {/* Play Button - New Style (Glass Squircle) */}
-                                                    <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${currentTrack?.id === track.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100'}`}>
-                                                        <div className="w-14 h-14 bg-white/10 backdrop-blur-md border border-white/20 rounded-[18px] flex items-center justify-center shadow-2xl text-white hover:bg-white/20 hover:scale-105 transition-all cursor-pointer">
+                                                    <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 z-10 pointer-events-none ${currentTrack?.id === track.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100'}`}>
+                                                        <div className="w-14 h-14 bg-white/10 backdrop-blur-md border border-white/20 rounded-[18px] flex items-center justify-center shadow-2xl text-white hover:bg-white/20 hover:scale-105 transition-all cursor-pointer pointer-events-auto">
                                                             {currentTrack?.id === track.id && isPlaying ? (
                                                                 <Pause size={22} fill="white" className="drop-shadow-lg" />
                                                             ) : (
@@ -542,7 +548,7 @@ const Profile = () => {
 
                                                     {/* Like Button (Top Right) */}
                                                     <button
-                                                        className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all duration-200 transform hover:scale-110 z-10 ${track.is_liked ? 'bg-red-500/20 text-red-500' : 'bg-black/20 text-white/70 hover:bg-black/40 hover:text-white'}`}
+                                                        className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all duration-200 transform hover:scale-110 z-20 ${track.is_liked ? 'bg-red-500/20 text-red-500' : 'bg-black/20 text-white/70 hover:bg-black/40 hover:text-white'}`}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleToggleLike(track.id);
@@ -552,7 +558,7 @@ const Profile = () => {
                                                     </button>
 
                                                     {/* Bottom Left: BPM */}
-                                                    <div className="absolute bottom-3 left-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity delay-75">
+                                                    <div className="absolute bottom-3 left-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity delay-75 pointer-events-none">
                                                         {track.analysis?.bpm && (
                                                             <span className="text-[10px] font-bold text-white/80 drop-shadow-md">
                                                                 {Math.round(track.analysis.bpm)} BPM
@@ -561,7 +567,7 @@ const Profile = () => {
                                                     </div>
 
                                                     {/* Bottom Right: Duration (New) */}
-                                                    <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity delay-75">
+                                                    <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity delay-75 pointer-events-none">
                                                         <span className="text-xs font-medium text-white/90 tracking-wide drop-shadow-md font-mono">
                                                             {track.analysis?.duration ? new Date(track.analysis.duration * 1000).toISOString().substr(14, 5) : (track.duration_formatted || '03:42')}
                                                         </span>
@@ -693,7 +699,21 @@ const Profile = () => {
                                 Add to Playlist
                             </button>
                             <div className="h-px bg-white/5 my-1" />
-                            <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left">
+                            <button
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                                onClick={() => {
+                                    // Find track again or use passed ID
+                                    const menuTrack = (activeTab === 'likes' ? likedTracks : tracks).find(t => t.id === activeMenu.id);
+                                    if (menuTrack && menuTrack.artist?.slug) {
+                                        navigate(`/artist/${menuTrack.artist.slug}`);
+                                    } else if (menuTrack && menuTrack.user?.username) {
+                                        // Fallback to user profile if no artist slug? Or just nothing.
+                                        // Current logic suggests tracks have artist relation.
+                                        console.warn("No artist slug found for track");
+                                    }
+                                    setActiveMenu(null);
+                                }}
+                            >
                                 <User size={16} />
                                 Go to Artist
                             </button>
