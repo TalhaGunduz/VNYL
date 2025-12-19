@@ -26,20 +26,27 @@ const MusicPlayer: React.FC = () => {
 
     // Up Next / Suggestions Logic
     const [upNext, setUpNext] = useState<any[]>([]);
+    const [viewMode, setViewMode] = useState<'song' | 'video'>('song');
+
+    // Switch to video mode automatically if user explicitly toggles it, 
+    // but maybe default to song. 
+    // Actually, let's keep it simple: manual toggle.
 
     useEffect(() => {
-        if (isExpanded && upNext.length === 0) {
-            // Fetch random suggestions
-            fetch('http://127.0.0.1:8000/api/tracks/random?limit=10')
+        if (isExpanded && currentTrack) {
+            // Fetch random suggestions whenever track changes (infinite loop effect)
+            fetch(`http://127.0.0.1:8000/api/tracks/random?limit=20`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        setUpNext(data.tracks);
+                        // Filter out current track to avoid duplication
+                        const suggestions = data.tracks.filter((t: any) => t.id !== currentTrack.id);
+                        setUpNext(suggestions);
                     }
                 })
                 .catch(err => console.error("Failed to fetch suggestions", err));
         }
-    }, [isExpanded]);
+    }, [isExpanded, currentTrack?.id]);
 
     const handleArtistClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -109,6 +116,8 @@ const MusicPlayer: React.FC = () => {
             disablekb: 1,
             fs: 0,
             iv_load_policy: 3,
+            modestbranding: 1,
+            rel: 0,
         },
     };
 
@@ -162,16 +171,7 @@ const MusicPlayer: React.FC = () => {
     return (
         <>
             {/* Hidden YouTube Player */}
-            {currentTrack.youtube_video_id && (
-                <div className="absolute top-0 left-0 w-0 h-0 overflow-hidden opacity-0 pointer-events-none">
-                    <YouTube
-                        videoId={currentTrack.youtube_video_id}
-                        opts={opts}
-                        onReady={onReady}
-                        onStateChange={onStateChange}
-                    />
-                </div>
-            )}
+            {/* Hidden YouTube Player - MOVED to main container for seamless toggle */}{/* ... */}
 
             {/* Bottom Player Bar - Z Index 50 ensures it is above expanded view (Z Index 40) */}
             <div
@@ -288,7 +288,7 @@ const MusicPlayer: React.FC = () => {
                 </div>
 
                 {/* Header / Close Button */}
-                <div className="relative z-10 w-full flex justify-end p-6">
+                <div className="relative z-10 w-full flex justify-end items-center p-6">
                     <button
                         onClick={() => setIsExpanded(false)}
                         className="bg-white/5 hover:bg-white/10 text-white/50 hover:text-white p-2 rounded-full transition-all"
@@ -299,21 +299,103 @@ const MusicPlayer: React.FC = () => {
                 </div>
 
                 {/* Main Content Layout */}
-                <div className="relative z-10 flex-1 grid grid-cols-12 gap-8 px-12 pb-8 h-full">
+                <div className="relative z-10 flex-1 grid grid-cols-12 gap-8 px-12 pb-32 pt-0 -mt-16 h-full overflow-hidden">
 
                     {/* Center: Now Playing Focus */}
-                    <div className="col-span-8 flex flex-col items-center justify-center h-full">
-                        <div className="w-[45vh] max-w-[500px] aspect-square rounded-lg shadow-2xl elevation-high overflow-hidden relative group mb-8">
-                            <img
-                                src={coverUrl}
-                                className="w-full h-full object-cover"
-                            />
+                    <div
+                        className="col-span-8 flex flex-col items-center justify-start h-full cursor-pointer"
+                        onClick={(e) => {
+                            if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('a')) return;
+                            togglePlay();
+                        }}
+                    >
+                        {/* Toggle Song / Video */}
+                        {currentTrack.youtube_video_id && (
+                            <div className="flex items-center gap-1 bg-white/10 p-1 rounded-full mb-6">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setViewMode('song'); }}
+                                    className={`px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${viewMode === 'song' ? 'bg-white text-black shadow-lg' : 'text-white/50 hover:text-white'}`}
+                                >
+                                    Şarkı
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setViewMode('video'); }}
+                                    className={`px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${viewMode === 'video' ? 'bg-white text-black shadow-lg' : 'text-white/50 hover:text-white'}`}
+                                >
+                                    Video
+                                </button>
+                            </div>
+                        )}
+
+                        <div
+                            className={`relative group mb-8 shrink-0 transition-all duration-500 ease-out shadow-2xl elevation-high rounded-lg overflow-hidden ${viewMode === 'video' ? 'w-[90%] max-w-[50rem] aspect-video max-h-[55vh]' : 'w-[50vh] max-w-[450px] max-h-[50vh] aspect-square'}`}
+                        >
+                            {/* Video Layer (Always active if exists, covered by Art in song mode) */}
+                            {currentTrack.youtube_video_id && (
+                                <div className="absolute inset-0 w-full h-full">
+                                    <YouTube
+                                        videoId={currentTrack.youtube_video_id}
+                                        opts={{
+                                            ...opts,
+                                            height: '100%',
+                                            width: '100%',
+                                            playerVars: { ...opts.playerVars, controls: 0 }
+                                        }} // Override dims
+                                        onReady={onReady}
+                                        onStateChange={onStateChange}
+                                        className="w-full h-full pointer-events-none"
+                                        iframeClassName="w-full h-full object-cover"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Video Pause Overlay (Hides YouTube clutter) */}
+                            <div
+                                className={`absolute inset-0 z-20 flex items-center justify-center transition-opacity duration-300 overflow-hidden ${viewMode === 'video' && !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    togglePlay();
+                                }}
+                            >
+                                {/* Background Image */}
+                                <div className="absolute inset-0">
+                                    <img
+                                        src={coverUrl}
+                                        alt="Paused Cover"
+                                        className="w-full h-full object-cover blur-sm scale-105"
+                                    />
+                                    <div className="absolute inset-0 bg-black/60" /> {/* Dim overlay */}
+                                </div>
+
+                                <Play size={64} fill="white" className="text-white drop-shadow-lg scale-110 relative z-30" />
+                            </div>
+
+                            {/* Album Art Layer */}
+                            <div
+                                className={`absolute inset-0 transition-opacity duration-500 z-10 ${viewMode === 'video' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    togglePlay();
+                                }}
+                            >
+                                <img
+                                    src={coverUrl}
+                                    className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-[2px]">
+                                    {isPlaying ? (
+                                        <Pause size={48} fill="white" className="text-white drop-shadow-lg" />
+                                    ) : (
+                                        <Play size={48} fill="white" className="text-white drop-shadow-lg ml-2" />
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="text-center space-y-2 max-w-2xl">
-                            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">{currentTrack.title}</h1>
+                        <div className="text-center space-y-2 max-w-2xl px-4">
+                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight leading-tight">{currentTrack.title}</h1>
                             <p
-                                className="text-xl text-white/60 font-medium hover:text-[var(--accent)] hover:underline cursor-pointer transition-colors"
+                                className="text-lg text-white/60 font-medium hover:text-[var(--accent)] hover:underline cursor-pointer transition-colors"
                                 onClick={handleArtistClick}
                             >
                                 {currentTrack.featured_artist || "Unknown Artist"}
@@ -322,15 +404,31 @@ const MusicPlayer: React.FC = () => {
                     </div>
 
                     {/* Right: Up Next / Suggestions */}
-                    <div className="col-span-4 h-full pl-8 border-l border-white/5 hidden lg:flex flex-col">
-                        <div className="mb-6 flex items-center justify-between">
-                            <h3 className="text-sm font-bold text-white/40 uppercase tracking-widest">Sıradaki Parçalar</h3>
-                            <button className="text-xs text-white/40 hover:text-white border border-white/10 px-3 py-1 rounded-full uppercase font-bold tracking-wider hover:bg-white/5 transition-all">Listeyi Kaydet</button>
+                    <div className="col-span-4 h-full pl-8 border-l border-white/5 hidden lg:flex flex-col pt-12">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-white/90">Sıradaki Parçalar</h3>
+                            <button className="text-xs text-white/40 hover:text-white transition-colors font-medium">Kaydet</button>
                         </div>
 
                         {/* Queue List */}
-                        <div className="flex-1 overflow-y-auto pr-2 space-y-2 mask-linear-fade">
-                            {/* Current Playing (Sticky?) No, just list items */}
+                        <div className="flex-1 max-h-[70vh] overflow-y-auto space-y-2 mask-linear-fade no-scrollbar -mr-2 pr-2">
+                            {/* Current Playing (Sticky at top) */}
+                            <div className="flex items-center gap-3 p-2 rounded-md bg-white/10 border border-[var(--accent)]/30 cursor-default transition-all group mb-2">
+                                <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-[#222]">
+                                    <img
+                                        src={coverUrl}
+                                        className="w-full h-full object-cover opacity-100"
+                                    />
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                        <div className="w-3 h-3 bg-[var(--accent)] rounded-full animate-pulse shadow-[0_0_10px_var(--accent)]" />
+                                    </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-bold text-[var(--accent)] truncate">{currentTrack.title}</div>
+                                    <div className="text-xs text-white/50 truncate">{currentTrack.featured_artist || "Unknown Artist"}</div>
+                                </div>
+                                <span className="text-xs font-mono text-[var(--accent)]">Çalıyor</span>
+                            </div>
 
                             {upNext.map((track, i) => (
                                 <div
@@ -339,7 +437,7 @@ const MusicPlayer: React.FC = () => {
                                         e.stopPropagation();
                                         playTrack(track); // Use playTrack from context
                                     }}
-                                    className="flex items-center gap-3 p-3 rounded-md bg-white/5 hover:bg-white/10 border border-transparent hover:border-white/10 cursor-pointer transition-all group"
+                                    className="flex items-center gap-3 p-2 rounded-md hover:bg-white/5 cursor-pointer transition-all group"
                                 >
                                     <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-[#222]">
                                         <img

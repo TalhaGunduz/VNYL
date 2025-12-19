@@ -4,15 +4,22 @@
 
 /* App base colors (redundant with inline styles, but ensures background while loading) */
 :root {
-  --bg: #09090b; /* Deeper black */
-  --bg-card: #18181b; /* Zinc 900 */
+  --bg: #09090b;
+  /* Deeper black */
+  --bg-card: #18181b;
+  /* Zinc 900 */
   --fg: #fafafa;
-  --accent: #FF6B00; /* VNYL Orange/Peach */
+  --accent: #FF6B00;
+  /* VNYL Orange/Peach */
   --accent-light: #FF8534;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
+  overflow: hidden;
+  /* Prevent global scrollbar */
 }
 
 body {
@@ -24,4 +31,17 @@ body {
 /* Smooth scrolling for a modern feel */
 html {
   scroll-behavior: smooth;
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+  }
 }

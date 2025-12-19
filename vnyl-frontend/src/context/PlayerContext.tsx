@@ -20,6 +20,7 @@ interface Track {
     };
     is_liked?: boolean;
     likes_count?: number;
+    duration?: number; // Added duration
     artist?: {
         id: number;
         slug: string;
