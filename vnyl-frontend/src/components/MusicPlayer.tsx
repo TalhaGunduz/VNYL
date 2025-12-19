@@ -48,6 +48,19 @@ const MusicPlayer: React.FC = () => {
         }
     }, [isExpanded, currentTrack?.id]);
 
+    // Lock body scroll when player is expanded
+    useEffect(() => {
+        if (isExpanded) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isExpanded]);
+
     const handleArtistClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (currentTrack?.artist?.slug) {
