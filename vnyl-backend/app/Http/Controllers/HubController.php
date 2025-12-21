@@ -33,47 +33,16 @@ class HubController extends Controller
      */
     public function index()
     {
-        $tracks = collect();
-
-        foreach ($this->curatedArtists as $artistName) {
-            // 1. Check if we have this artist in DB
-            $artistTracks = Track::with('artist')
-                ->where('featured_artist', 'LIKE', "%{$artistName}%")
-                ->orWhere('title', 'LIKE', "%{$artistName}%")
-                ->inRandomOrder()
-                ->take(3) // Fetch up to 3 tracks per artist
-                ->get();
-
-            if ($artistTracks->isNotEmpty()) {
-                $tracks = $tracks->merge($artistTracks);
-            } else {
-                // 2. If missing, Auto-Import ONE track for this artist
-                $newTrack = $this->importCuratedTrack($artistName);
-                if ($newTrack) {
-                    $newTrack->load('artist');
-                    $tracks->push($newTrack);
-                }
-            }
-        }
-
-        // 3. Backfill with random tracks to ensure the page looks full
-        if ($tracks->count() < 20) {
-            $needed = 20 - $tracks->count();
-            $randomTracks = Track::with('artist')
-                ->whereNotIn('id', $tracks->pluck('id')) // Avoid duplicates
-                ->inRandomOrder()
-                ->take($needed)
-                ->get();
-            
-            $tracks = $tracks->merge($randomTracks);
-        }
-
-        // Shuffle and Limit
-        $finalTracks = $tracks->unique('id')->shuffle()->take(30)->values();
+        // Fetch 50 random tracks from the database to ensure variety and fairness
+        // This allows all artists (including new ones) to appear on the Hub.
+        $tracks = Track::with('artist')
+            ->inRandomOrder()
+            ->take(50)
+            ->get();
 
         return response()->json([
             'status' => 'success',
-            'tracks' => $finalTracks
+            'tracks' => $tracks // Frontend will handle display
         ]);
     }
 

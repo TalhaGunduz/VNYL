@@ -152,15 +152,24 @@ class TrackController extends Controller
 
             $coverPath = $request->hasFile('cover') ? $request->file('cover')->store('covers', 'public') : null;
 
-            $userId = 1; // Temporary
+            $user = $request->user();
+            $userId = $user ? $user->id : 1; 
+
+            // Artist Logic
+            $artistId = null;
+            if ($user && $user->artist) {
+                $artistId = $user->artist->id;
+            }
 
             $track = \App\Models\Track::create([
                 'user_id' => $userId,
+                'artist_id' => $artistId, // Link to Artist Profile
                 'title' => $request->input('title'),
                 'file_path' => $newFilename,
                 'cover_path' => $coverPath,
                 'featured_artist' => $request->input('featured_artist'),
-                'status' => 'published' // User clicked publish
+                'status' => 'published', // User clicked publish
+                'is_public' => true // Ensure visibility
             ]);
 
             $analysisData = $request->input('analysis');

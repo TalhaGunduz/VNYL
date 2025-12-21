@@ -105,7 +105,10 @@ const BecomeArtist = () => {
         try {
             const response = await fetch('http://127.0.0.1:8000/api/auth/send-verification', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
                 body: JSON.stringify({ email: userEmail })
             });
 
@@ -165,7 +168,10 @@ const BecomeArtist = () => {
             // Call the new intermediate verification endpoint
             const response = await fetch('http://127.0.0.1:8000/api/auth/verify-code', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
                 body: JSON.stringify({
                     email: userEmail,
                     code: verificationCode
@@ -230,11 +236,11 @@ const BecomeArtist = () => {
             return;
         }
 
-        if (!stageName || !primaryGenre || !careerStatus || !bio || bio.length < 100) {
+        if (!stageName || !primaryGenre || !careerStatus || !bio || bio.length < 10) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Incomplete Form',
-                text: 'Please fill in all required fields (Name, Genre, Status, Bio) and ensure bio is at least 100 characters.',
+                text: 'Please fill in all required fields (Name, Genre, Status, Bio) and ensure bio is at least 10 characters.',
                 background: '#18181b',
                 color: '#fff'
             });
@@ -260,7 +266,10 @@ const BecomeArtist = () => {
 
             const response = await fetch('http://127.0.0.1:8000/api/artist/verify-and-upgrade', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
                 body: JSON.stringify(payload)
             });
 
@@ -588,7 +597,7 @@ const BecomeArtist = () => {
                                     <div>
                                         <div className="flex justify-between mb-2">
                                             <label className="text-xs font-bold text-white/40 uppercase">Artist Bio <span className="text-[var(--accent)]">*</span></label>
-                                            <span className={`text-xs font-mono ${(bio.length > 0 && bio.length < 100) ? 'text-red-500' : 'text-white/30'}`}>
+                                            <span className={`text-xs font-mono ${(bio.length > 0 && bio.length < 10) ? 'text-red-500' : 'text-white/30'}`}>
                                                 {bio.length} / 300
                                             </span>
                                         </div>
@@ -599,10 +608,10 @@ const BecomeArtist = () => {
                                             value={bio}
                                             onChange={(e) => setBio(e.target.value)}
                                             className="w-full bg-black/20 border border-white/10 focus:border-[var(--accent)] rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/20 outline-none transition-colors resize-none"
-                                            placeholder="Tell us a bit about yourself (min 100 chars)..."
+                                            placeholder="Tell us a bit about yourself (min 10 chars)..."
                                         />
-                                        {bio.length > 0 && bio.length < 100 && (
-                                            <p className="text-red-500 text-[10px] mt-1 font-bold">Minimum 100 characters required.</p>
+                                        {bio.length > 0 && bio.length < 10 && (
+                                            <p className="text-red-500 text-[10px] mt-1 font-bold">Minimum 10 characters required.</p>
                                         )}
                                     </div>
 

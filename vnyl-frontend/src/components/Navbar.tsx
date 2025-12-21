@@ -55,8 +55,8 @@ const Navbar = () => {
 
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
 
-    if (val.length < 2) {
-      setSearchResults([]);
+    if (val.length < 1) {
+      setSearchResults({ artists: [], tracks: [] });
       setShowResults(false);
       return;
     }
@@ -65,49 +65,27 @@ const Navbar = () => {
       setIsSearching(true);
       setShowResults(true);
       try {
-        // Call Search Endpoint
-        const res = await fetch('http://127.0.0.1:8000/api/youtube/search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: val })
-        });
+        // Call Local Search Endpoint
+        const res = await fetch(`http://127.0.0.1:8000/api/global-search?query=${val}`);
         const data = await res.json();
-        if (data.status === 'success' && data.results.items) {
-          setSearchResults(data.results.items);
+
+        if (data.status === 'success') {
+          // data.artists, data.tracks
+          setSearchResults(data);
         }
       } catch (err) {
         console.error(err);
       } finally {
         setIsSearching(false);
       }
-    }, 500); // 500ms Debounce
+    }, 300); // 300ms Debounce (Faster response)
   };
 
-  const handleResultClick = async (item: any) => {
-    // 1. Close Search
+  const handleTrackClick = (track: any) => {
+    playTrack(track);
     setShowResults(false);
     setQuery('');
-
-    // 2. Import & Play
-    try {
-      // Optimistic UI? Or simple loading toast? For now, straight call.
-      const res = await fetch('http://127.0.0.1:8000/api/youtube/import', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}` // If auth needed
-        },
-        body: JSON.stringify({ query: `https://www.youtube.com/watch?v=${item.id.videoId}` }) // Pass URL or ID logic
-      });
-      const data = await res.json();
-      if (data.status === 'success' && data.track) {
-        playTrack(data.track);
-      }
-    } catch (err) {
-      console.error("Import failed", err);
-    }
   };
-
 
   return (
     <>
@@ -137,11 +115,11 @@ const Navbar = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[var(--accent)] transition-colors" size={16} />
               <input
                 type="text"
-                placeholder="Search any song..."
+                placeholder="Search songs, artists..."
                 className="w-full bg-white/5 border border-white/5 rounded-full pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-[var(--accent)]/50 focus:bg-white/10 transition-all placeholder:text-white/20"
                 value={query}
                 onChange={handleSearch}
-                onFocus={() => query.length >= 2 && setShowResults(true)}
+                onFocus={() => query.length >= 1 && setShowResults(true)}
               />
               {isSearching && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -152,33 +130,66 @@ const Navbar = () => {
 
             {/* Search Dropdown */}
             <AnimatePresence>
-              {showResults && searchResults.length > 0 && (
+              {showResults && (searchResults.artists?.length > 0 || searchResults.tracks?.length > 0) && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-full mt-2 left-0 right-0 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-[60vh] overflow-y-auto"
+                  className="absolute top-full mt-2 left-0 right-0 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-[70vh] overflow-y-auto"
                 >
-                  {searchResults.map((item: any) => (
-                    <div
-                      key={item.id.videoId}
-                      onClick={() => handleResultClick(item)}
-                      className="flex items-center gap-3 p-3 hover:bg-white/5 cursor-pointer group transition-colors"
-                    >
-                      <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden">
-                        <img src={item.snippet.thumbnails.default.url} alt="" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                          <Play size={12} className="text-white" fill="currentColor" />
-                        </div>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-white truncate group-hover:text-[var(--accent)] transition-colors">
-                          {item.snippet.title}
-                        </p>
-                        <p className="text-xs text-white/50 truncate">{item.snippet.channelTitle}</p>
-                      </div>
+
+                  {/* ARTISTS SECTION */}
+                  {searchResults.artists?.length > 0 && (
+                    <div className="p-2">
+                      <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider px-2 py-1 mb-1">Artists</h3>
+                      {searchResults.artists.map((artist: any) => (
+                        <Link
+                          to={`/artist/${artist.slug}`}
+                          key={artist.id}
+                          onClick={() => { setShowResults(false); setQuery(''); }}
+                          className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg transition-colors"
+                        >
+                          <img src={artist.avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
+                          <span className="text-sm font-medium text-white">{artist.stage_name}</span>
+                        </Link>
+                      ))}
                     </div>
-                  ))}
+                  )}
+
+                  {/* Divider */}
+                  {searchResults.artists?.length > 0 && searchResults.tracks?.length > 0 && (
+                    <div className="h-px bg-white/5 mx-2 my-1"></div>
+                  )}
+
+                  {/* TRACKS SECTION */}
+                  {searchResults.tracks?.length > 0 && (
+                    <div className="p-2">
+                      <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider px-2 py-1 mb-1">Songs</h3>
+                      {searchResults.tracks.map((track: any) => (
+                        <div
+                          key={track.id}
+                          onClick={() => handleTrackClick(track)}
+                          className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg cursor-pointer group transition-colors"
+                        >
+                          <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden">
+                            <img src={track.cover_image || `http://127.0.0.1:8000/storage/${track.cover_path}`} alt="" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Play size={12} className="text-white" fill="currentColor" />
+                            </div>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-white truncate group-hover:text-[var(--accent)] transition-colors">
+                              {track.title}
+                            </p>
+                            <p className="text-xs text-white/50 truncate">
+                              {track.featured_artist || track.artist?.stage_name}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                 </motion.div>
               )}
             </AnimatePresence>

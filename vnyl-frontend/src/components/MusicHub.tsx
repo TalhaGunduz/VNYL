@@ -90,7 +90,7 @@ const MusicHub = ({ isOpen, onClose }: MusicHubProps) => {
                                         onClick={() => playTrack(track)}
                                     >
                                         <img
-                                            src={track.cover_image || track.cover_path || '/default-cover.png'}
+                                            src={track.cover_image || (track.cover_path ? `http://127.0.0.1:8000/storage/${track.cover_path}` : '/default-cover.png')}
                                             alt={track.title}
                                             className="w-full h-full object-cover group-hover:opacity-60 transition-opacity"
                                         />

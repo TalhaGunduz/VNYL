@@ -15,7 +15,7 @@ Route::post('/youtube/search', [\App\Http\Controllers\YouTubeController::class, 
 Route::post('/youtube/import', [\App\Http\Controllers\YouTubeController::class, 'import']);
 
 // Standard Routes
-Route::post('/login', [\App\Http\Controllers\AuthController::class, 'login']);
+Route::post('/login', [\App\Http\Controllers\AuthController::class, 'login'])->name('login');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
@@ -49,13 +49,19 @@ Route::get('/users/{id}/tracks', [\App\Http\Controllers\TrackController::class, 
 Route::get('/search', [\App\Http\Controllers\TrackController::class, 'search']); // DB Search
 Route::get('/tracks/random', [\App\Http\Controllers\TrackController::class, 'random']); 
 Route::get('/hub', [\App\Http\Controllers\HubController::class, 'index']); // New Curated Hub Logic
+Route::get('/global-search', [\App\Http\Controllers\SearchController::class, 'index']); // Instant Search
 
-// Artist Flow
-Route::post('/auth/send-verification', [\App\Http\Controllers\ArtistController::class, 'sendVerification']);
-Route::post('/auth/verify-code', [\App\Http\Controllers\ArtistController::class, 'verifyCode']);
-Route::post('/artist/verify-and-upgrade', [\App\Http\Controllers\ArtistController::class, 'verifyAndUpgrade']);
+// Artist Flow (Public/Semi-public but checks auth manually? No, should be guarded)
+// actually, verify-code might be clicked from email without login? 
+// No, the flow is in-app.
+// I will move them to the auth group below or add middleware here.
+
+Route::post('/auth/send-verification', [\App\Http\Controllers\ArtistController::class, 'sendVerification'])->middleware('auth:sanctum');
+Route::post('/auth/verify-code', [\App\Http\Controllers\ArtistController::class, 'verifyCode'])->middleware('auth:sanctum');
+Route::post('/artist/verify-and-upgrade', [\App\Http\Controllers\ArtistController::class, 'verifyAndUpgrade'])->middleware('auth:sanctum');
 Route::match(['put', 'post'], '/artist/profile', [\App\Http\Controllers\ArtistController::class, 'updateProfile'])->middleware('auth:sanctum');
-Route::get('/artist/stats', [\App\Http\Controllers\ArtistController::class, 'getStats']);
+Route::get('/artist/stats', [\App\Http\Controllers\ArtistController::class, 'getStats']); // Stats public? Maybe not.
+
 
 // Public Artist Directory (Hub & Artist Page)
 Route::get('/artists', [\App\Http\Controllers\ArtistController::class, 'index']);
