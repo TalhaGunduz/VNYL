@@ -22,8 +22,9 @@ const Profile = () => {
         try {
             let endpoint = '';
             if (activeTab === 'likes') endpoint = 'my-likes';
-            else if (activeTab === 'my_tracks') endpoint = 'my-tracks';
+            else if (activeTab === 'my_tracks') endpoint = 'tracks';
             else if (activeTab === 'playlists') endpoint = 'playlists';
+            else if (activeTab === 'vnyl_picks') endpoint = 'users/1/tracks'; // Fetching User 1 (VNYL) tracks for this tab
 
             if (!endpoint) return;
 
@@ -366,6 +367,12 @@ const Profile = () => {
                         >
                             My Tracks
                         </button>
+                        <button
+                            onClick={() => setActiveTab('vnyl_picks')}
+                            className={`font-bold text-lg pb-4 -mb-4.5 transition-colors ${activeTab === 'vnyl_picks' ? 'text-white border-b-2 border-[var(--accent)]' : 'text-white/40 hover:text-white'}`}
+                        >
+                            VNYL Selections
+                        </button>
                     </div>
 
                     {/* Tab Content */}
@@ -642,6 +649,82 @@ const Profile = () => {
                                     <button onClick={() => navigate('/upload')} className="px-6 py-2.5 bg-[var(--accent)] text-white font-bold rounded-xl hover:scale-105 transition-transform shadow-lg shadow-[var(--accent)]/20">
                                         Upload Now
                                     </button>
+                                </div>
+                            )
+                        )}
+
+                        {activeTab === 'vnyl_picks' && (
+                            tracks.length > 0 ? (
+                                <div className="col-span-1 md:col-span-2 lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6">
+                                    {tracks.map((track: any) => (
+                                        <div
+                                            key={track.id}
+                                            className="bg-white/5 border border-white/5 rounded-2xl p-4 hover:bg-white/10 transition-all group hover:-translate-y-2 hover:shadow-2xl hover:shadow-[var(--accent)]/10 cursor-pointer"
+                                            onClick={() => playTrack(track)}
+                                        >
+                                            <div
+                                                className="aspect-square bg-white/5 rounded-xl mb-4 relative overflow-hidden shadow-lg group-hover:shadow-2xl group-hover:shadow-black/50 transition-all transform-gpu"
+                                            >
+                                                {track.cover_image || track.cover_path ? (
+                                                    <img src={track.cover_image || `http://127.0.0.1:8000/storage/${track.cover_path}`} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
+                                                        <Music size={48} className="text-white/20" />
+                                                    </div>
+                                                )}
+
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+
+                                                <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 z-10 pointer-events-none ${currentTrack?.id === track.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100'}`}>
+                                                    <div className="w-14 h-14 bg-white/10 backdrop-blur-md border border-white/20 rounded-[18px] flex items-center justify-center shadow-2xl text-white hover:bg-white/20 hover:scale-105 transition-all cursor-pointer pointer-events-auto">
+                                                        {currentTrack?.id === track.id && isPlaying ? (
+                                                            <Pause size={22} fill="white" className="drop-shadow-lg" />
+                                                        ) : (
+                                                            <Play size={22} fill="white" className="ml-1 drop-shadow-lg" />
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all duration-200 transform hover:scale-110 z-20 ${track.is_liked ? 'bg-red-500/20 text-red-500' : 'bg-black/20 text-white/70 hover:bg-black/40 hover:text-white'}`}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleLike(track.id);
+                                                    }}
+                                                >
+                                                    <Heart size={18} fill={track.is_liked ? "currentColor" : "none"} className={`drop-shadow-md ${track.is_liked ? 'animate-in zoom-in spin-in-12 duration-300' : ''}`} />
+                                                </button>
+
+                                                <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity delay-75 pointer-events-none">
+                                                    <span className="text-xs font-medium text-white/90 tracking-wide drop-shadow-md font-mono">
+                                                        {track.analysis?.duration ? new Date(track.analysis.duration * 1000).toISOString().substr(14, 5) : (track.duration_formatted || '03:42')}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1 relative">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <h3 className="font-bold text-white truncate text-base group-hover:text-[var(--accent)] transition-colors" title={track.title}>
+                                                        {track.title}
+                                                    </h3>
+                                                    <button className="text-white/20 hover:text-white transition-colors p-1" onClick={(e) => { e.stopPropagation(); }}>
+                                                        <MoreVertical size={18} />
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-xs text-white/40 truncate flex-1 hover:text-white/60 transition-colors">{track.featured_artist || "VNYL Selection"}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="col-span-full py-24 text-center flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-3xl bg-white/5">
+                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 animate-pulse">
+                                        <Music size={32} className="text-white/20" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white mb-2">No Selections Available</h3>
+                                    <p className="text-white/40 max-w-sm mx-auto">VNYL hasn't selected any tracks yet. Check back soon.</p>
                                 </div>
                             )
                         )}

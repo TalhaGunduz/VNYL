@@ -27,10 +27,14 @@ class TrackController extends Controller
             $absolutePath = \Illuminate\Support\Facades\Storage::disk('local')->path($tempPath);
 
             // 3. Call Audio Service
-            $audioServiceUrl = 'http://127.0.0.1:8003/analyze/full';
+            $audioServiceUrl = 'http://127.0.0.1:8001/analyze/full';
+            \Illuminate\Support\Facades\Log::info("Calling Audio Service", ['url' => $audioServiceUrl, 'path' => $absolutePath]);
+
             $response = \Illuminate\Support\Facades\Http::get($audioServiceUrl, [
                 'path' => $absolutePath
             ]);
+
+            \Illuminate\Support\Facades\Log::info("Audio Service Response", ['status' => $response->status(), 'body' => $response->body()]);
 
             if ($response->successful()) {
                 $analysisData = $response->json();
@@ -46,6 +50,7 @@ class TrackController extends Controller
                     'metadata' => $metadata
                 ]);
             } else {
+                \Illuminate\Support\Facades\Log::error("Audio Service Failed", ['response' => $response->body()]);
                 return response()->json([
                     'status' => 'error', 
                     'message' => 'Audio analysis failed', 
@@ -54,15 +59,30 @@ class TrackController extends Controller
             }
 
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Track Analysis Exception", ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
+    }
+
+    public function userTracks($id, Request $request)
+    {
+        $tracks = \App\Models\Track::where('user_id', $id)
+            ->where('is_public', true)
+            ->with('analysis')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'tracks' => $tracks
+        ]);
     }
 
     public function index(Request $request)
     {
         // For now, assume User ID 1 or use auth().
         // Since we are moving towards auth, let's try to get auth user, fallback to 1 only for testing.
-        $userId = $request->user() ? $request->user()->id : 1; 
+        $userId = $request->user()->id;
 
         $tracks = \App\Models\Track::where('user_id', $userId)
             ->with('analysis') // Eager load analysis

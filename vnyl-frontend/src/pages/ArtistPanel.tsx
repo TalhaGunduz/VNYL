@@ -166,7 +166,10 @@ const ArtistPanel = () => {
                         <Settings size={18} />
                         Settings
                     </button>
-                    <button className="flex items-center gap-2 px-5 py-2 bg-[var(--accent)] hover:bg-red-600 hover:scale-105 active:scale-95 text-white rounded-xl font-bold shadow-lg shadow-red-900/20 transition-all">
+                    <button
+                        onClick={() => navigate('/upload')}
+                        className="flex items-center gap-2 px-5 py-2 bg-[var(--accent)] hover:bg-red-600 hover:scale-105 active:scale-95 text-white rounded-xl font-bold shadow-lg shadow-red-900/20 transition-all"
+                    >
                         <Upload size={18} />
                         New Release
                     </button>

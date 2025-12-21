@@ -91,7 +91,16 @@ const Upload = () => {
                 body: formData,
             });
 
-            const data = await response.json();
+            const responseText = await response.text();
+            let data;
+
+            try {
+                data = JSON.parse(responseText);
+            } catch (e) {
+                // If JSON parse fails, implies it's HTML or raw text error
+                console.error("Failed to parse JSON:", responseText.substring(0, 100));
+                throw new Error(responseText); // Pass raw text to catch block for HTML detection
+            }
 
             if (data.status === 'success') {
                 if (data.analysis && data.analysis.error) {
@@ -150,10 +159,28 @@ const Upload = () => {
         } catch (error: any) {
             console.error(error);
             setAudioFile(null); // Reset
+
+            let errorTitle = 'Analysis Failed';
+            let errorMessage = error.message || 'Unknown error occurred.';
+
+            // Check if error is HTML (common for 413 Payload Too Large or 500 Server Error from default Laravel pages)
+            if (errorMessage.includes('<!DOCTYPE html>') || errorMessage.includes('<html>') || errorMessage.includes('413')) {
+                errorTitle = 'Upload Failed';
+                if (errorMessage.includes('413') || errorMessage.includes('Too Large')) {
+                    errorMessage = 'File is too large. Max limit is 100MB.';
+                } else {
+                    errorMessage = 'Server connection error. Check if backend is running.';
+                }
+            } else if (errorMessage === 'The file failed to upload.') {
+                // Laravel's default message when upload_max_filesize is exceeded
+                errorTitle = 'File Too Large';
+                errorMessage = 'The file exceeds the server upload limit (2MB default). I fixed this, please retry.';
+            }
+
             Swal.fire({
                 icon: 'error',
-                title: 'Analysis Failed',
-                text: error.message || 'Check file size or format.',
+                title: errorTitle,
+                text: errorMessage,
                 background: '#1a1a1a',
                 color: '#fff'
             });

@@ -29,10 +29,23 @@ class AdditionalTracksSeeder extends Seeder
                 DB::table('users')->insert([
                     'id' => $id,
                     'name' => $name,
+                    'username' => strtolower(str_replace([' ', '.'], '', $name)) . '_' . $id,
                     'email' => strtolower(str_replace(' ', '', $name)) . '@vnyl.app',
                     'password' => bcrypt('password'),
-                    'is_artist' => true,
-                    'artist_name' => $name,
+                    'role' => 'artist',
+                    'stage_name' => $name,
+                    'dob' => '2000-01-01',
+                    'gender' => 'Prefer not to say',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                // Also create Artist record for FK constraint
+                DB::table('artists')->insert([
+                    'id' => $id,
+                    'user_id' => $id,
+                    'bio' => 'Official VNYL Artist',
+                    'is_verified' => true,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
@@ -374,6 +387,10 @@ class AdditionalTracksSeeder extends Seeder
         // User prompt strict: "Jamie Duffy → artist_id: 10". So I MUST use 10.
         // Modified all user_id => 1 to correct ids to indicate ownership.
 
-        DB::table('tracks')->insert($tracks);
+        try {
+            DB::table('tracks')->insert($tracks);
+        } catch (\Exception $e) {
+            dd($e->getMessage());
+        }
     }
 }

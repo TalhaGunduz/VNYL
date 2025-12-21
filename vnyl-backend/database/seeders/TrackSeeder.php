@@ -14,14 +14,16 @@ class TrackSeeder extends Seeder
     public function run(): void
     {
         // Ensure at least one user exists
-        $user = User::first();
-        if (!$user) {
-            $user = User::factory()->create([
+        $user = User::firstOrCreate(
+            ['email' => 'admin@vnyl.app'],
+            [
                 'name' => 'System Admin',
-                'email' => 'admin@vnyl.app',
+                'username' => 'system_admin',
                 'password' => bcrypt('password'),
-            ]);
-        }
+                'dob' => '2000-01-01',
+                'gender' => 'Prefer not to say',
+            ]
+        );
 
         $tracks = [
             ['title' => 'Starboy', 'artist' => 'The Weeknd'],

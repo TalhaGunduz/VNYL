@@ -71,7 +71,7 @@ Route::middleware(['web'])->group(function () {
 
 
 
-Route::get('/my-tracks', [TrackController::class, 'index']); // Public for now or handled inside with fallback auth logic
+
 Route::post('/analyze', [TrackController::class, 'analyze']);
 Route::post('/publish', [TrackController::class, 'publish']);
 
