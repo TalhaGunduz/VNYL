@@ -14,7 +14,7 @@ const Profile = () => {
     const [tracks, setTracks] = useState<any[]>([]); // Uploaded tracks
     const [likedTracks, setLikedTracks] = useState<any[]>([]); // Liked tracks
     const [playlists, setPlaylists] = useState<any[]>([]); // Playlists
-    const [activeMenu, setActiveMenu] = useState<{ id: number, x: number, y: number, opensUp?: boolean, opensLeft?: boolean } | null>(null); // Track Menu State
+    const [activeMenu, setActiveMenu] = useState<{ track: any, x: number, y: number, opensUp?: boolean, opensLeft?: boolean } | null>(null); // Track Menu State
     const [addToPlaylistTrackId, setAddToPlaylistTrackId] = useState<number | null>(null); // Add to Playlist Modal State
     const [isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState(false);
 
@@ -405,7 +405,33 @@ const Profile = () => {
                                                 className="aspect-square bg-white/5 rounded-xl mb-4 relative overflow-hidden shadow-lg group-hover:shadow-2xl group-hover:shadow-black/50 transition-all transform-gpu"
                                             >
                                                 {track.cover_image || track.cover_path ? (
-                                                    <img src={track.cover_image || `http://127.0.0.1:8000/storage/${track.cover_path}`} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                                                    <img
+                                                        src={track.cover_image || `http://127.0.0.1:8000/storage/${track.cover_path}`}
+                                                        alt={track.title}
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                                                        onError={(e) => {
+                                                            const target = e.target as HTMLImageElement;
+                                                            // Hide the image and show the parent's background/placeholder if possible, 
+                                                            // or strictly replace src with a known safe placeholder if we had one.
+                                                            // For now, let's just make it invisible so the background 'Music' icon shows? 
+                                                            // Actually the background Music icon is in the ELSE block.
+                                                            // We should replace this IMG with the fallback DIV logic.
+                                                            // But we can't easily swap DOM nodes in onError.
+                                                            // Better approach: Set state in component? Too complex for loop.
+                                                            // Simple approach: Set src to a transparent pixel or standard placeholder.
+                                                            // We don't have a standard placeholder URL handy. 
+                                                            // Let's toggle the 'display' to none, so the sibling (if we had one) shows? 
+                                                            // Wait, the Else block is conditional in REACT, not CSS.
+                                                            // Let's use a reliable placeholder service like ui-avatars or just use style to hide it.
+                                                            target.style.display = 'none';
+                                                            // We need to ensure the parent shows the fallback.
+                                                            // The parent currently ONLY shows fallback if `track.cover_*` is falsy.
+                                                            // So we might need to change the logic to: always render fallback behind?
+                                                            // Or better: Use a stateful Image component?
+                                                            // For this quick fix in a map loop, let's just use a generic placeholder image.
+                                                            target.src = "https://placehold.co/400x400/1a1a1a/FFF?text=VNYL";
+                                                        }}
+                                                    />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
                                                         <Music size={48} className="text-white/20" />
@@ -451,7 +477,27 @@ const Profile = () => {
                                                         {track.title}
                                                     </h3>
                                                     {/* Context Menu Button - Simplified */}
-                                                    <button className="text-white/20 hover:text-white transition-colors p-1" onClick={(e) => { e.stopPropagation(); /* Menu logic here if needed, or reuse */ }}>
+                                                    <button
+                                                        className={`text-white/20 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10 ${activeMenu?.id === track.id ? 'text-white opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const rect = e.currentTarget.getBoundingClientRect();
+                                                            const menuWidth = 224;
+                                                            const menuHeight = 190;
+                                                            const scrollX = window.scrollX;
+                                                            const scrollY = window.scrollY;
+
+                                                            const isOnRightHalf = rect.left > window.innerWidth / 2;
+                                                            const isOnBottomHalf = rect.top > window.innerHeight * 0.6;
+
+                                                            setActiveMenu(activeMenu?.track?.id === track.id ? null : {
+                                                                track,
+                                                                x: isOnRightHalf ? (rect.right + scrollX - menuWidth) : (rect.left + scrollX),
+                                                                y: isOnBottomHalf ? (rect.top + scrollY - menuHeight - 8) : (rect.bottom + scrollY + 8),
+                                                                opensUp: isOnBottomHalf,
+                                                                opensLeft: isOnRightHalf
+                                                            });
+                                                        }}>
                                                         <MoreVertical size={18} />
                                                     </button>
                                                 </div>
@@ -546,7 +592,15 @@ const Profile = () => {
                                                     className="aspect-square bg-white/5 rounded-xl mb-4 relative overflow-hidden shadow-lg group-hover:shadow-2xl group-hover:shadow-black/50 transition-all transform-gpu"
                                                 >
                                                     {track.cover_image || track.cover_path ? (
-                                                        <img src={track.cover_image || `http://127.0.0.1:8000/storage/${track.cover_path}`} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                                                        <img
+                                                            src={track.cover_image || `http://127.0.0.1:8000/storage/${track.cover_path}`}
+                                                            alt={track.title}
+                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                                                            onError={(e) => {
+                                                                const target = e.target as HTMLImageElement;
+                                                                target.src = "https://placehold.co/400x400/1a1a1a/FFF?text=VNYL";
+                                                            }}
+                                                        />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
                                                             <Music size={48} className="text-white/20" />
@@ -615,8 +669,8 @@ const Profile = () => {
                                                                 const isOnRightHalf = rect.left > window.innerWidth / 2;
                                                                 const isOnBottomHalf = rect.top > window.innerHeight * 0.6; // Bias slightly to bottom
 
-                                                                setActiveMenu(activeMenu?.id === track.id ? null : {
-                                                                    id: track.id,
+                                                                setActiveMenu(activeMenu?.track?.id === track.id ? null : {
+                                                                    track,
                                                                     // X: If right side, align right edge. Else align left edge.
                                                                     x: isOnRightHalf ? (rect.right + scrollX - menuWidth) : (rect.left + scrollX),
                                                                     // Y: If bottom side, open upwards. Else open downwards.
@@ -680,7 +734,15 @@ const Profile = () => {
                                                 className="aspect-square bg-white/5 rounded-xl mb-4 relative overflow-hidden shadow-lg group-hover:shadow-2xl group-hover:shadow-black/50 transition-all transform-gpu"
                                             >
                                                 {track.cover_image || track.cover_path ? (
-                                                    <img src={track.cover_image || `http://127.0.0.1:8000/storage/${track.cover_path}`} alt={track.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                                                    <img
+                                                        src={track.cover_image || `http://127.0.0.1:8000/storage/${track.cover_path}`}
+                                                        alt={track.title}
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                                                        onError={(e) => {
+                                                            const target = e.target as HTMLImageElement;
+                                                            target.src = "https://placehold.co/400x400/1a1a1a/FFF?text=VNYL";
+                                                        }}
+                                                    />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
                                                         <Music size={48} className="text-white/20" />
@@ -721,7 +783,27 @@ const Profile = () => {
                                                     <h3 className="font-bold text-white truncate text-base group-hover:text-[var(--accent)] transition-colors" title={track.title}>
                                                         {track.title}
                                                     </h3>
-                                                    <button className="text-white/20 hover:text-white transition-colors p-1" onClick={(e) => { e.stopPropagation(); }}>
+                                                    <button
+                                                        className={`text-white/20 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10 ${activeMenu?.id === track.id ? 'text-white opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const rect = e.currentTarget.getBoundingClientRect();
+                                                            const menuWidth = 224;
+                                                            const menuHeight = 190;
+                                                            const scrollX = window.scrollX;
+                                                            const scrollY = window.scrollY;
+
+                                                            const isOnRightHalf = rect.left > window.innerWidth / 2;
+                                                            const isOnBottomHalf = rect.top > window.innerHeight * 0.6;
+
+                                                            setActiveMenu(activeMenu?.id === track.id ? null : {
+                                                                track,
+                                                                x: isOnRightHalf ? (rect.right + scrollX - menuWidth) : (rect.left + scrollX),
+                                                                y: isOnBottomHalf ? (rect.top + scrollY - menuHeight - 8) : (rect.bottom + scrollY + 8),
+                                                                opensUp: isOnBottomHalf,
+                                                                opensLeft: isOnRightHalf
+                                                            });
+                                                        }}>
                                                         <MoreVertical size={18} />
                                                     </button>
                                                 </div>
@@ -763,7 +845,7 @@ const Profile = () => {
                         <div className="p-1 space-y-0.5">
                             {/* Find the track object to check like status */}
                             {(() => {
-                                const menuTrack = (activeTab === 'likes' ? likedTracks : tracks).find(t => t.id === activeMenu.id);
+                                const menuTrack = activeMenu.track;
                                 if (!menuTrack) return null;
 
                                 return (
@@ -788,7 +870,7 @@ const Profile = () => {
                                 className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
                                 onClick={() => {
                                     if (activeMenu) {
-                                        handleAddToPlaylist(activeMenu.id);
+                                        handleAddToPlaylist(activeMenu.track.id);
                                     }
                                 }}
                             >
@@ -799,14 +881,16 @@ const Profile = () => {
                             <button
                                 className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
                                 onClick={() => {
-                                    // Find track again or use passed ID
-                                    const menuTrack = (activeTab === 'likes' ? likedTracks : tracks).find(t => t.id === activeMenu.id);
-                                    if (menuTrack && menuTrack.artist?.slug) {
-                                        navigate(`/artist/${menuTrack.artist.slug}`);
-                                    } else if (menuTrack && menuTrack.user?.username) {
-                                        // Fallback to user profile if no artist slug? Or just nothing.
-                                        // Current logic suggests tracks have artist relation.
-                                        console.warn("No artist slug found for track");
+                                    const menuTrack = activeMenu.track;
+
+                                    if (menuTrack) {
+                                        if (menuTrack.artist?.slug) {
+                                            navigate(`/artist/${menuTrack.artist.slug}`);
+                                        } else if (menuTrack.user?.username) {
+                                            console.warn("Track has no linked artist, attempting user navigation");
+                                        } else {
+                                            console.warn("No artist info found on track", menuTrack);
+                                        }
                                     }
                                     setActiveMenu(null);
                                 }}

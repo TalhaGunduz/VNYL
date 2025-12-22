@@ -68,7 +68,8 @@ class TrackController extends Controller
     {
         $tracks = \App\Models\Track::where('user_id', $id)
             ->where('is_public', true)
-            ->with('analysis')
+            ->where('is_public', true)
+            ->with(['analysis', 'artist'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -85,7 +86,7 @@ class TrackController extends Controller
         $userId = $request->user()->id;
 
         $tracks = \App\Models\Track::where('user_id', $userId)
-            ->with('analysis') // Eager load analysis
+            ->with(['analysis', 'artist']) // Eager load analysis
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -104,6 +105,8 @@ class TrackController extends Controller
         
         // Fetch random public tracks. Prefer ones with covers.
         $tracks = \App\Models\Track::where('is_public', true)
+        $tracks = \App\Models\Track::where('is_public', true)
+                    ->with(['analysis', 'artist'])
                     ->inRandomOrder()
                     ->take($limit)
                     ->get();

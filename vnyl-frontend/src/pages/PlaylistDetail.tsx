@@ -147,8 +147,12 @@ const PlaylistDetail = () => {
                     <div className="w-52 h-52 md:w-64 md:h-64 bg-[#1c1c1e] rounded-xl shadow-2xl flex items-center justify-center relative overflow-hidden group border border-white/5">
                         {playlist.tracks && playlist.tracks.filter((t: any) => t.cover_path).length >= 4 ? (
                             <div className="grid grid-cols-2 w-full h-full">
-                                {playlist.tracks.filter((t: any) => t.cover_path).slice(0, 4).map((t: any, i: number) => (
-                                    <img key={i} src={`http://127.0.0.1:8000/storage/${t.cover_path}`} className="w-full h-full object-cover" />
+                                {playlist.tracks.filter((t: any) => t.cover_path || t.cover_image).slice(0, 4).map((t: any, i: number) => (
+                                    <img
+                                        key={i}
+                                        src={t.cover_image || `http://127.0.0.1:8000/storage/${t.cover_path}`}
+                                        className="w-full h-full object-cover"
+                                    />
                                 ))}
                             </div>
                         ) : playlist.tracks && playlist.tracks.find((t: any) => t.cover_path) ? (
@@ -232,12 +236,28 @@ const PlaylistDetail = () => {
                                 </div>
 
                                 <div className="w-12 h-12 bg-white/5 rounded-md overflow-hidden shrink-0">
-                                    {track.cover_path && <img src={`http://127.0.0.1:8000/storage/${track.cover_path}`} className="w-full h-full object-cover" />}
+                                    <img
+                                        src={
+                                            track.cover_image
+                                                ? track.cover_image
+                                                : track.cover_path
+                                                    ? `http://127.0.0.1:8000/storage/${track.cover_path}`
+                                                    : `https://ui-avatars.com/api/?name=${encodeURIComponent(track.title)}&background=random`
+                                        }
+                                        onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            target.style.display = 'none';
+                                            target.parentElement!.innerHTML = '<div class="w-full h-full bg-gradient-to-br from-gray-800 to-black flex items-center justify-center text-white/20"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>';
+                                        }}
+                                        className="w-full h-full object-cover"
+                                    />
                                 </div>
 
                                 <div className="flex-1 min-w-0">
                                     <div className="text-white font-bold truncate">{track.title}</div>
-                                    <div className="text-white/40 text-sm truncate">{track.user?.name || track.featured_artist}</div>
+                                    <div className="text-white/40 text-sm truncate">
+                                        {track.featured_artist || track.artist?.stage_name || track.user?.name}
+                                    </div>
                                 </div>
 
                                 <div className="text-white/40 text-sm w-24 text-right hidden md:block">
@@ -267,7 +287,23 @@ const PlaylistDetail = () => {
                         {suggestedTracks.filter(st => !playlist.tracks?.some((pt: any) => pt.id === st.id)).slice(0, 10).map((track) => (
                             <div key={track.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group">
                                 <div className="w-12 h-12 bg-white/5 rounded-md overflow-hidden shrink-0 relative group/img">
-                                    {track.cover_path && <img src={`http://127.0.0.1:8000/storage/${track.cover_path}`} className="w-full h-full object-cover opacity-60 group-hover/img:opacity-100 transition-opacity" />}
+                                    <img
+                                        src={
+                                            track.cover_image
+                                                ? track.cover_image
+                                                : track.cover_path
+                                                    ? `http://127.0.0.1:8000/storage/${track.cover_path}`
+                                                    : `https://ui-avatars.com/api/?name=${encodeURIComponent(track.title)}&background=random`
+                                        }
+                                        onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            // Fallback to Icon
+                                            target.style.display = 'none';
+                                            target.parentElement!.style.backgroundColor = '#1f2937'; // gray-800
+                                            // Ideally we'd replace with SVG but for simplicity in Recommended we might just hide or show placeholder
+                                        }}
+                                        className="w-full h-full object-cover opacity-60 group-hover/img:opacity-100 transition-opacity"
+                                    />
                                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100">
                                         <button onClick={() => playTrack(track)}><Play size={16} fill="white" className="text-white drop-shadow-md" /></button>
                                     </div>
@@ -275,7 +311,9 @@ const PlaylistDetail = () => {
 
                                 <div className="flex-1 min-w-0">
                                     <div className="text-white font-medium truncate">{track.title}</div>
-                                    <div className="text-white/40 text-sm truncate">{track.user?.name || track.featured_artist}</div>
+                                    <div className="text-white/40 text-sm truncate">
+                                        {track.featured_artist || track.artist?.stage_name || track.user?.name}
+                                    </div>
                                 </div>
 
                                 <button

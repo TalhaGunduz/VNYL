@@ -41,7 +41,7 @@ class LikeController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
 
-        $likes = $user->likes()->with(['user', 'analysis'])->latest('track_likes.created_at')->get();
+        $likes = $user->likes()->with(['user', 'analysis', 'artist'])->latest('track_likes.created_at')->get();
 
         return response()->json([
             'status' => 'success',
