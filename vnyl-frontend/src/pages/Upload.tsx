@@ -1,17 +1,10 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload as UploadIcon, Music, Image as ImageIcon, X, CheckCircle2, Mic2, Search, ChevronDown } from 'lucide-react';
 import Swal from 'sweetalert2';
 
-const GENRES = [
-    "Pop", "Hip Hop", "Rap", "Rock", "Electronic", "R&B", "Indie", "Alternative",
-    "K-Pop", "Country", "Classical", "Jazz", "Blues", "Soul", "Reggae",
-    "Metal", "Punk", "Folk", "Latin", "Techno", "House", "Trance", "Dubstep",
-    "Disco", "Funk", "Gospel", "Opera", "Ambient", "Trap", "Grunge", "Ska",
-    "Lo-Fi", "Afrobeat", "Reggaeton", "Dancehall", "Drum & Bass", "Synthwave",
-    "Arabesk", "Türkü (Turkish Folk)", "Turkish Pop", "Anatolian Rock",
-    "Turkish Art Music (Sanat Müziği)", "Fantezi"
-].sort();
+import SearchableSelect from '../components/SearchableSelect';
+import { GENRES } from '../constants/profile-data';
 
 const Toast = Swal.mixin({
     toast: true,
@@ -36,10 +29,8 @@ const Upload = () => {
 
     // Genre State
     const [genre, setGenre] = useState('');
-    const [genreSearch, setGenreSearch] = useState('');
-    const [isGenreOpen, setIsGenreOpen] = useState(false);
+    const [user, setUser] = useState<any>(null);
     const [featuredArtist, setFeaturedArtist] = useState('');
-
     const [coverFile, setCoverFile] = useState<File | null>(null);
     const [audioFile, setAudioFile] = useState<File | null>(null);
     const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -49,11 +40,17 @@ const Upload = () => {
     const coverInputRef = useRef<HTMLInputElement>(null);
     const audioInputRef = useRef<HTMLInputElement>(null);
 
-    // Filter logic removed as Genre is now locked to auto-analysis validation
-    // But keeping it if we ever want to show it for info purposes or if requirement changes
-    const filteredGenres = useMemo(() => {
-        return GENRES.filter(g => g.toLowerCase().includes(genreSearch.toLowerCase()));
-    }, [genreSearch]);
+    // Load User
+    useEffect(() => {
+        const stored = localStorage.getItem('user');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            setUser(parsed);
+            if (parsed.stage_name) {
+                setFeaturedArtist(parsed.stage_name);
+            }
+        }
+    }, []);
 
     const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -86,8 +83,17 @@ const Upload = () => {
             const formData = new FormData();
             formData.append('file', file);
 
+            const token = localStorage.getItem('token');
+            const headers: HeadersInit = {
+                'Accept': 'application/json',
+            };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const response = await fetch('http://127.0.0.1:8000/api/analyze', {
                 method: 'POST',
+                headers: headers,
                 body: formData,
             });
 
@@ -120,7 +126,14 @@ const Upload = () => {
                 // Auto-fill form
                 if (data.metadata) {
                     setTitle(data.metadata.title || file.name.replace(/\.[^/.]+$/, ""));
-                    setFeaturedArtist(data.metadata.artist || '');
+
+                    // Prioritize User Stage Name, then Metadata Artist, then empty
+                    // The user requested: "artist profile name... not profile name but artist name"
+                    if (user?.stage_name) {
+                        setFeaturedArtist(user.stage_name);
+                    } else {
+                        setFeaturedArtist(data.metadata.artist || '');
+                    }
 
                     // Set Cover Art if available
                     if (data.metadata.cover_art) {
@@ -174,7 +187,7 @@ const Upload = () => {
             } else if (errorMessage === 'The file failed to upload.') {
                 // Laravel's default message when upload_max_filesize is exceeded
                 errorTitle = 'File Too Large';
-                errorMessage = 'The file exceeds the server upload limit (2MB default). I fixed this, please retry.';
+                errorMessage = 'The file exceeds the server upload limit (2MB default). Please update "upload_max_filesize" in your php.ini.';
             }
 
             Swal.fire({
@@ -257,6 +270,7 @@ const Upload = () => {
             formData.append('temp_path', tempPath);
             formData.append('title', title);
             formData.append('featured_artist', featuredArtist);
+            formData.append('description', description);
             formData.append('genre', genre);
 
             // Pass full analysis data back to be saved
@@ -279,8 +293,17 @@ const Upload = () => {
                 formData.append('cover', coverFile);
             }
 
+            const token = localStorage.getItem('token');
+            const headers: HeadersInit = {
+                'Accept': 'application/json',
+            };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const response = await fetch('http://127.0.0.1:8000/api/publish', {
                 method: 'POST',
+                headers: headers,
                 body: formData,
             });
 
@@ -318,7 +341,7 @@ const Upload = () => {
             <div className="fixed top-0 left-0 w-full h-[500px] bg-gradient-to-b from-[#1a1a1a] to-transparent pointer-events-none" />
             <div className="fixed -top-[200px] -left-[200px] w-[600px] h-[600px] bg-[var(--accent)]/5 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="max-w-6xl mx-auto pt-32 px-6 pb-20 relative z-10" onClick={() => setIsGenreOpen(false)}>
+            <div className="max-w-6xl mx-auto pt-32 px-6 pb-20 relative z-10">
                 <div className="mb-12 text-center md:text-left">
                     <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter mb-2">Upload Music</h1>
                     <p className="text-white/40 text-lg">Share your sound with the world.</p>
@@ -423,25 +446,31 @@ const Upload = () => {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Locked Genre Display */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-white/40 uppercase tracking-wider ml-1">Genre (AI Analysis)</label>
-                                        <div className="w-full bg-white/5 border border-white/5 rounded-xl px-5 py-4 text-white/60 font-medium cursor-not-allowed">
-                                            {genre || 'Pending Analysis...'}
-                                        </div>
-                                    </div>
+                                    {/* Edit: Genre Convertible to Dropdown */}
+                                    <SearchableSelect
+                                        label="Genre"
+                                        options={GENRES}
+                                        value={genre}
+                                        onChange={(val) => setGenre(val)}
+                                        placeholder="Select Genre"
+                                    />
 
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-white/40 uppercase tracking-wider ml-1">Featured Artist</label>
-                                        <div className="relative">
+                                        <label className="text-xs font-bold text-white/40 uppercase tracking-wider ml-1">Artist Name</label>
+                                        <div className="relative opacity-60 cursor-not-allowed">
                                             <Mic2 size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
                                             <input
+                                                readOnly
+                                                disabled
                                                 type="text"
-                                                className="w-full bg-black/40 border-0 rounded-xl pl-12 pr-5 py-4 text-white font-medium focus:ring-2 focus:ring-[var(--accent)] transition-all placeholder:text-white/20"
-                                                placeholder="Add collaborator (Optional)"
+                                                className="w-full bg-black/40 border-0 rounded-xl pl-12 pr-5 py-4 text-white font-medium focus:ring-0 cursor-not-allowed placeholder:text-white/20"
+                                                placeholder="Enter Artist Name"
                                                 value={featuredArtist}
-                                                onChange={(e) => setFeaturedArtist(e.target.value)}
                                             />
+                                            {/* Locked Shield Icon to indicate read-only */}
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--accent)]">
+                                                <CheckCircle2 size={16} />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

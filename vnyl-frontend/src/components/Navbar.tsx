@@ -10,7 +10,7 @@ const Navbar = () => {
 
   // Search State
   const [query, setQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any>({ artists: [], tracks: [] });
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const searchTimeout = useRef<any>(null);
@@ -144,7 +144,7 @@ const Navbar = () => {
                       <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider px-2 py-1 mb-1">Artists</h3>
                       {searchResults.artists.map((artist: any) => (
                         <Link
-                          to={`/artist/${artist.slug}`}
+                          to={`/artist/${artist.slug || artist.id}`}
                           key={artist.id}
                           onClick={() => { setShowResults(false); setQuery(''); }}
                           className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg transition-colors"

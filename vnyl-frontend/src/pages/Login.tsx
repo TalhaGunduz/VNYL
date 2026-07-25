@@ -79,7 +79,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-bg text-fg flex items-center justify-center p-4 relative">
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 pointer-events-none">
         <video
           key={randomVideo}
           src={randomVideo}

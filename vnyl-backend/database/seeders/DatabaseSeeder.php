@@ -23,9 +23,10 @@ class DatabaseSeeder extends Seeder
         // ]);
         
         $this->call([
-            TrackSeeder::class,
-            AdditionalTracksSeeder::class,
-            VnylSelectionsSeeder::class,
+            MusicImportSeeder::class,
+            // TrackSeeder::class,
+            // AdditionalTracksSeeder::class,
+            // VnylSelectionsSeeder::class,
         ]);
     }
 }

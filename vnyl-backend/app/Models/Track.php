@@ -17,7 +17,9 @@ class Track extends Model
         'cover_image',
         'duration',
         'is_public',
-        'artist_id'
+        'artist_id',
+        'plays',
+        'description'
     ];
     
     protected $casts = [

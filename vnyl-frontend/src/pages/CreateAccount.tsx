@@ -13,6 +13,7 @@ const CreateAccount = () => {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
+    name: '',
     username: '',
     email: '',
     password: '',
@@ -34,20 +35,25 @@ const CreateAccount = () => {
 
     if (googlePending === 'true') {
       setIsGoogleSignup(true);
+      const googleName = params.get('name') || '';
       setFormData(prev => ({
         ...prev,
+        name: googleName,
         email: params.get('email') || '',
-        username: params.get('name') || '',
+        // Suggest a username based on name, but let them edit
+        username: googleName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9_.]/g, ''),
         google_id: params.get('google_id') || '',
         avatar: params.get('avatar') || '',
         location: params.get('location') || ''
       }));
     } else if (facebookPending === 'true') {
       setIsFacebookSignup(true);
+      const fbName = params.get('name') || '';
       setFormData(prev => ({
         ...prev,
+        name: fbName,
         email: params.get('email') || '',
-        username: params.get('name') || '',
+        username: fbName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9_.]/g, ''),
         facebook_id: params.get('facebook_id') || '',
         avatar: params.get('avatar') || ''
       }));
@@ -55,7 +61,11 @@ const CreateAccount = () => {
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    let value = e.target.value;
+    if (e.target.name === 'username') {
+      value = value.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9_.]/g, '');
+    }
+    setFormData({ ...formData, [e.target.name]: value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,7 +110,7 @@ const CreateAccount = () => {
         });
       } else {
         // Handle errors
-        console.log('Error response data:', data);
+        // console.log('Error response data:', data);
 
         let errorMessage = 'Something went wrong.';
 
@@ -155,7 +165,7 @@ const CreateAccount = () => {
 
   return (
     <div className="min-h-screen bg-bg text-fg flex items-center justify-center p-4 relative">
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 pointer-events-none">
         <video
           key={randomVideo}
           src={randomVideo}
@@ -209,8 +219,30 @@ const CreateAccount = () => {
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
+              <label htmlFor="name" className="sr-only">Display Name</label>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                required
+                value={formData.name}
+                onChange={handleChange}
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-accent focus:border-accent focus:z-10 sm:text-sm rounded-t-md"
+                placeholder="Display Name (e.g. Talha Gündüz)"
+              />
+            </div>
+            <div>
               <label htmlFor="username" className="sr-only">Username</label>
-              <input id="username" name="username" type="text" required value={formData.username} onChange={handleChange} disabled={isGoogleSignup || isFacebookSignup} className={`appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-accent focus:border-accent focus:z-10 sm:text-sm rounded-t-md ${isGoogleSignup || isFacebookSignup ? 'opacity-50 cursor-not-allowed' : ''}`} placeholder="Username" />
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                value={formData.username}
+                onChange={handleChange}
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-accent focus:border-accent focus:z-10 sm:text-sm font-mono"
+                placeholder="Username (e.g. talha_123)"
+              />
             </div>
             <div>
               <label htmlFor="email-address" className="sr-only">Email address</label>

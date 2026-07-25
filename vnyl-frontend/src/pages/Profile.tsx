@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Music, Heart, Trash2, Play, Pause, MoreVertical, ListPlus, Share2, User, ListMusic, X, Lock, Globe } from 'lucide-react';
+import { MapPin, Calendar, Music, Heart, Trash2, Play, Pause, MoreVertical, ListPlus, Share2, User, ListMusic, X, Lock, Globe, Plus } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { usePlayer } from '../context/PlayerContext';
 import AddToPlaylistModal from '../components/AddToPlaylistModal';
@@ -14,6 +14,7 @@ const Profile = () => {
     const [tracks, setTracks] = useState<any[]>([]); // Uploaded tracks
     const [likedTracks, setLikedTracks] = useState<any[]>([]); // Liked tracks
     const [playlists, setPlaylists] = useState<any[]>([]); // Playlists
+    const [following, setFollowing] = useState<any[]>([]); // Followed users
     const [activeMenu, setActiveMenu] = useState<{ track: any, x: number, y: number, opensUp?: boolean, opensLeft?: boolean } | null>(null); // Track Menu State
     const [addToPlaylistTrackId, setAddToPlaylistTrackId] = useState<number | null>(null); // Add to Playlist Modal State
     const [isCreatePlaylistModalOpen, setIsCreatePlaylistModalOpen] = useState(false);
@@ -24,6 +25,7 @@ const Profile = () => {
             if (activeTab === 'likes') endpoint = 'my-likes';
             else if (activeTab === 'my_tracks') endpoint = 'tracks';
             else if (activeTab === 'playlists') endpoint = 'playlists';
+            else if (activeTab === 'following') endpoint = 'me/following';
             else if (activeTab === 'vnyl_picks') endpoint = 'users/1/tracks'; // Fetching User 1 (VNYL) tracks for this tab
 
             if (!endpoint) return;
@@ -39,6 +41,8 @@ const Profile = () => {
                     setLikedTracks(data.tracks);
                 } else if (activeTab === 'playlists') {
                     setPlaylists(data.playlists);
+                } else if (activeTab === 'following') {
+                    setFollowing(data.following);
                 } else {
                     setTracks(data.tracks);
                 }
@@ -89,13 +93,29 @@ const Profile = () => {
 
 
     useEffect(() => {
-        // Load user from localStorage
+        // Load user from localStorage initially for speed
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
             try {
                 const parsedUser = JSON.parse(storedUser);
                 setUser(parsedUser);
                 fetchTracks();
+
+                // Fetch fresh user data (background update)
+                fetch('http://127.0.0.1:8000/api/user', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.id) {
+                            setUser(data);
+                            localStorage.setItem('user', JSON.stringify(data));
+                        }
+                    })
+                    .catch(err => console.error("Failed to refresh user data", err));
+
             } catch (e) {
                 console.error("Failed to parse user data", e);
             }
@@ -105,16 +125,69 @@ const Profile = () => {
     }, [navigate, activeTab]);
 
     const handleToggleLike = async (trackId: number) => {
-
+        const token = localStorage.getItem('token');
+        if (!token) {
+            Swal.fire({
+                title: 'Giriş Gerekli',
+                text: 'Şarkıları beğenmek için giriş yapmalısınız.',
+                icon: 'info',
+                showCancelButton: true,
+                confirmButtonText: 'Giriş Yap',
+                cancelButtonText: 'İptal',
+                background: '#161616',
+                color: '#fff',
+                confirmButtonColor: '#FF6B00',
+                cancelButtonColor: '#333',
+                customClass: {
+                    popup: 'rounded-[24px]',
+                    confirmButton: 'rounded-full px-6 py-2',
+                    cancelButton: 'rounded-full px-6 py-2'
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    navigate('/login');
+                }
+            });
+            return;
+        }
 
         try {
             const response = await fetch(`http://127.0.0.1:8000/api/tracks/${trackId}/like`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 }
             });
+
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.dispatchEvent(new Event('storage'));
+                Swal.fire({
+                    title: 'Giriş Gerekli',
+                    text: 'Şarkıları beğenmek için giriş yapmalısınız.',
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonText: 'Giriş Yap',
+                    cancelButtonText: 'İptal',
+                    background: '#161616',
+                    color: '#fff',
+                    confirmButtonColor: '#FF6B00',
+                    cancelButtonColor: '#333',
+                    customClass: {
+                        popup: 'rounded-[24px]',
+                        confirmButton: 'rounded-full px-6 py-2',
+                        cancelButton: 'rounded-full px-6 py-2'
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        navigate('/login');
+                    }
+                });
+                return;
+            }
+
             const data = await response.json();
 
             if (data.status === 'success') {
@@ -162,9 +235,10 @@ const Profile = () => {
         if (result.isConfirmed) {
             try {
                 const token = localStorage.getItem('token');
-                const response = await fetch('http://127.0.0.1:8000/api/delete-account', {
+                const response = await fetch('http://127.0.0.1:8000/api/user/account', {
                     method: 'DELETE',
                     headers: {
+                        'Accept': 'application/json',
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
@@ -287,9 +361,9 @@ const Profile = () => {
 
                             {/* Bio Section */}
                             <div className="md:col-span-2 space-y-4">
-                                {user.bio ? (
+                                {user.artist_bio || user.bio ? (
                                     <p className="text-white/80 leading-relaxed text-lg font-light">
-                                        "{user.bio}"
+                                        "{user.artist_bio || user.bio}"
                                     </p>
                                 ) : (
                                     <p className="text-white/30 italic">No bio available yet.</p>
@@ -320,21 +394,18 @@ const Profile = () => {
                                 </div>
                             </div>
 
-                            {/* Stats Section (Mock -> Real) */}
+                            {/* Stats Section (Real Data) */}
                             <div className="flex justify-center md:justify-end gap-8">
                                 <div className="text-center">
-                                    <div className="text-3xl font-black text-white">1.2K</div>
-                                    <div className="text-xs uppercase tracking-widest text-white/40 font-bold mt-1">Followers</div>
-                                </div>
-                                <div className="text-center">
-                                    <div className="text-3xl font-black text-white">84</div>
+                                    <div className="text-3xl font-black text-white">{user.following_count || 0}</div>
                                     <div className="text-xs uppercase tracking-widest text-white/40 font-bold mt-1">Following</div>
                                 </div>
                                 <div className="text-center">
-                                    {/* Use real track count if available, or fallback to current list length if active */}
-                                    <div className="text-3xl font-black text-white">
-                                        {activeTab === 'my_tracks' ? tracks.length : (user.tracks_count !== undefined ? user.tracks_count : (tracks.length > 0 ? tracks.length : '-'))}
-                                    </div>
+                                    <div className="text-3xl font-black text-white">{user.likes_count !== undefined ? user.likes_count : '-'}</div>
+                                    <div className="text-xs uppercase tracking-widest text-white/40 font-bold mt-1">Liked Songs</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-3xl font-black text-white">{user.tracks_count !== undefined ? user.tracks_count : '-'}</div>
                                     <div className="text-xs uppercase tracking-widest text-white/40 font-bold mt-1">Tracks</div>
                                 </div>
                             </div>
@@ -386,6 +457,12 @@ const Profile = () => {
                             className={`font-bold text-lg pb-4 -mb-4.5 transition-colors ${activeTab === 'vnyl_picks' ? 'text-white border-b-2 border-[var(--accent)]' : 'text-white/40 hover:text-white'}`}
                         >
                             VNYL Selections
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('following')}
+                            className={`font-bold text-lg pb-4 -mb-4.5 transition-colors ${activeTab === 'following' ? 'text-white border-b-2 border-[var(--accent)]' : 'text-white/40 hover:text-white'}`}
+                        >
+                            Following
                         </button>
                     </div>
 
@@ -478,7 +555,7 @@ const Profile = () => {
                                                     </h3>
                                                     {/* Context Menu Button - Simplified */}
                                                     <button
-                                                        className={`text-white/20 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10 ${activeMenu?.id === track.id ? 'text-white opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                                        className={`text-white/20 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10 ${activeMenu?.track?.id === track.id ? 'text-white opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             const rect = e.currentTarget.getBoundingClientRect();
@@ -504,6 +581,9 @@ const Profile = () => {
                                                 <div className="flex items-center gap-2">
                                                     <p className="text-xs text-white/40 truncate flex-1 hover:text-white/60 transition-colors">{track.featured_artist || track.artist?.name || "Unknown Artist"}</p>
                                                 </div>
+                                                {track.description && (
+                                                    <p className="text-white/30 text-[10px] truncate mt-0.5">{track.description}</p>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -524,13 +604,15 @@ const Profile = () => {
                                 {/* Create New Playlist Card */}
                                 <div
                                     onClick={() => setIsCreatePlaylistModalOpen(true)}
-                                    className="aspect-square bg-white/5 border border-white/5 border-dashed rounded-2xl flex flex-col items-center justify-center hover:bg-white/10 transition-all cursor-pointer group hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--accent)]/10"
+                                    className="bg-white/5 border border-white/5 rounded-2xl p-4 hover:bg-white/10 transition-all cursor-pointer group hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--accent)]/10"
                                 >
-                                    <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                        <ListPlus size={28} className="text-white/40 group-hover:text-white" />
+                                    <div className="aspect-square bg-white/5 border-2 border-dashed border-white/10 rounded-xl mb-4 flex items-center justify-center group-hover:border-[var(--accent)] group-hover:bg-[var(--accent)]/5 transition-all">
+                                        <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center group-hover:scale-110 transition-transform group-hover:bg-[var(--accent)]">
+                                            <Plus size={24} className="text-white/40 group-hover:text-white transition-colors" />
+                                        </div>
                                     </div>
-                                    <h3 className="font-bold text-white text-base">Create</h3>
-                                    <p className="text-xs text-white/40 mt-0.5">New Playlist</p>
+                                    <h3 className="font-bold text-white text-base truncate group-hover:text-[var(--accent)] transition-colors">Create Playlist</h3>
+                                    <p className="text-xs text-white/40 mt-1">New Collection</p>
                                 </div>
 
                                 {/* Create Modal */}
@@ -544,22 +626,55 @@ const Profile = () => {
                                 {/* Real Playlists */}
                                 {playlists.map((playlist: any) => (
                                     <div key={playlist.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 hover:bg-white/10 transition-all cursor-pointer group hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--accent)]/10" onClick={() => navigate(`/playlists/${playlist.id}`)}>
-                                        <div className="aspect-square bg-gradient-to-br from-indigo-900 to-purple-900 rounded-xl mb-4 flex items-center justify-center relative overflow-hidden shadow-2xl">
-                                            {/* Gradient Overlay */}
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-60" />
-                                            {/* Placeholder Art */}
-                                            <div className="absolute inset-0 grid grid-cols-2 gap-0.5 opacity-50">
-                                                <div className="bg-white/10"></div>
-                                                <div className="bg-white/5"></div>
-                                                <div className="bg-white/5"></div>
-                                                <div className="bg-white/10"></div>
-                                            </div>
+                                        <div className="aspect-square bg-[#1c1c1e] rounded-xl mb-4 flex items-center justify-center relative overflow-hidden shadow-2xl group border border-white/5">
+                                            {playlist.tracks && playlist.tracks.length > 0 ? (
+                                                playlist.tracks.length === 1 ? (
+                                                    <img
+                                                        src={playlist.tracks[0].cover_image || (playlist.tracks[0].cover_path ? `http://127.0.0.1:8000/storage/${playlist.tracks[0].cover_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(playlist.tracks[0].title)}&background=random`)}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : playlist.tracks.length === 2 ? (
+                                                    <div className="grid grid-cols-2 w-full h-full">
+                                                        {playlist.tracks.map((track: any, i: number) => (
+                                                            <img
+                                                                key={i}
+                                                                src={track.cover_image || (track.cover_path ? `http://127.0.0.1:8000/storage/${track.cover_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(track.title)}&background=random`)}
+                                                                className="w-full h-full object-cover border-r border-[#1c1c1e] last:border-r-0"
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    // 3 or 4+ -> 2x2 Grid
+                                                    <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
+                                                        {Array.from({ length: 4 }).map((_, i) => {
+                                                            const track = playlist.tracks[i];
+                                                            if (track) {
+                                                                return (
+                                                                    <img
+                                                                        key={i}
+                                                                        src={track.cover_image || (track.cover_path ? `http://127.0.0.1:8000/storage/${track.cover_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(track.title)}&background=random`)}
+                                                                        className="w-full h-full object-cover border-[0.5px] border-[#1c1c1e]"
+                                                                    />
+                                                                );
+                                                            } else {
+                                                                return (
+                                                                    <div key={i} className="w-full h-full bg-[#2c2c2e] border-[0.5px] border-[#1c1c1e] flex items-center justify-center">
+                                                                        <Music size={24} className="text-white/5" />
+                                                                    </div>
+                                                                );
+                                                            }
+                                                        })}
+                                                    </div>
+                                                )
+                                            ) : (
+                                                <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-gray-900 flex items-center justify-center">
+                                                    <Music size={48} className="text-white/20" />
+                                                </div>
+                                            )}
 
                                             <div className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 backdrop-blur-md z-20">
                                                 {!playlist.is_public ? <Lock size={12} className="text-white/70" /> : <Globe size={12} className="text-white/70" />}
                                             </div>
-
-                                            <span className="text-3xl font-black text-white/20 relative z-10 uppercase">{playlist.title.substring(0, 2)}</span>
 
                                             <div className="absolute bottom-3 right-3 w-10 h-10 bg-[var(--accent)] rounded-full flex items-center justify-center shadow-lg translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
                                                 <Play size={18} fill="white" className="text-white" />
@@ -657,7 +772,7 @@ const Profile = () => {
 
                                                         {/* Context Menu Button */}
                                                         <button
-                                                            className={`text-white/20 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10 ${activeMenu?.id === track.id ? 'text-white opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                                            className={`text-white/20 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10 ${activeMenu?.track?.id === track.id ? 'text-white opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 const rect = e.currentTarget.getBoundingClientRect();
@@ -691,6 +806,9 @@ const Profile = () => {
                                                         )}
                                                         <p className="text-xs text-white/40 truncate flex-1 hover:text-white/60 transition-colors">{track.featured_artist || user.name}</p>
                                                     </div>
+                                                    {track.description && (
+                                                        <p className="text-white/30 text-[10px] truncate mt-0.5">{track.description}</p>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))
@@ -717,6 +835,40 @@ const Profile = () => {
                                     <button onClick={() => navigate('/upload')} className="px-6 py-2.5 bg-[var(--accent)] text-white font-bold rounded-xl hover:scale-105 transition-transform shadow-lg shadow-[var(--accent)]/20">
                                         Upload Now
                                     </button>
+                                </div>
+                            )
+                        )}
+
+                        {activeTab === 'following' && (
+                            following.length > 0 ? (
+                                <div className="col-span-1 md:col-span-2 lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                                    {following.filter((u: any) => u.artist).map((followedUser: any) => (
+                                        <div
+                                            key={followedUser.id}
+                                            className="bg-transparent rounded-2xl p-4 hover:bg-white/5 transition-all cursor-pointer group flex flex-col items-center text-center"
+                                            onClick={() => navigate(`/artist/${followedUser.artist?.slug || followedUser.artist?.id || followedUser.id}`)}
+                                        >
+                                            <div className="w-32 h-32 rounded-full overflow-hidden shadow-2xl mb-4 group-hover:scale-105 transition-transform bg-[#121212]">
+                                                <img
+                                                    src={followedUser.artist?.avatar || followedUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(followedUser.artist?.stage_name || followedUser.name)}&background=random`}
+                                                    alt={followedUser.artist?.stage_name || followedUser.name}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <h3 className="font-bold text-white text-base truncate w-full group-hover:text-[var(--accent)] transition-colors mt-2">
+                                                {followedUser.stage_name || followedUser.name}
+                                            </h3>
+                                            <p className="text-xs text-white/40 uppercase tracking-widest font-medium mt-1">Artist</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="col-span-full py-20 text-center flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-3xl bg-white/5">
+                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
+                                        <User size={32} className="text-white/20" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Not Following Anyone</h3>
+                                    <p className="text-white/40 max-w-sm mx-auto">Follow artists to see them here.</p>
                                 </div>
                             )
                         )}
@@ -784,7 +936,7 @@ const Profile = () => {
                                                         {track.title}
                                                     </h3>
                                                     <button
-                                                        className={`text-white/20 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10 ${activeMenu?.id === track.id ? 'text-white opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                                        className={`text-white/20 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10 ${activeMenu?.track?.id === track.id ? 'text-white opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             const rect = e.currentTarget.getBoundingClientRect();
@@ -796,7 +948,7 @@ const Profile = () => {
                                                             const isOnRightHalf = rect.left > window.innerWidth / 2;
                                                             const isOnBottomHalf = rect.top > window.innerHeight * 0.6;
 
-                                                            setActiveMenu(activeMenu?.id === track.id ? null : {
+                                                            setActiveMenu(activeMenu?.track?.id === track.id ? null : {
                                                                 track,
                                                                 x: isOnRightHalf ? (rect.right + scrollX - menuWidth) : (rect.left + scrollX),
                                                                 y: isOnBottomHalf ? (rect.top + scrollY - menuHeight - 8) : (rect.bottom + scrollY + 8),
@@ -857,15 +1009,11 @@ const Profile = () => {
                                         }}
                                     >
                                         <Heart size={16} fill={menuTrack.is_liked ? "currentColor" : "none"} className={menuTrack.is_liked ? "text-red-500" : ""} />
-                                        {menuTrack.is_liked ? "Remove from Queue" : "Like Song"}
+                                        {menuTrack.is_liked ? "Liked" : "Like Song"}
                                     </button>
                                 );
                             })()}
 
-                            <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left">
-                                <ListPlus size={16} />
-                                Add to Queue
-                            </button>
                             <button
                                 className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
                                 onClick={() => {
@@ -886,10 +1034,13 @@ const Profile = () => {
                                     if (menuTrack) {
                                         if (menuTrack.artist?.slug) {
                                             navigate(`/artist/${menuTrack.artist.slug}`);
-                                        } else if (menuTrack.user?.username) {
-                                            console.warn("Track has no linked artist, attempting user navigation");
+                                        } else if (menuTrack.user?.username && menuTrack.user?.role === 'artist') {
+                                            navigate(`/artist/${menuTrack.user.username}`);
                                         } else {
-                                            console.warn("No artist info found on track", menuTrack);
+                                            const artistName = menuTrack.featured_artist || menuTrack.artist?.stage_name || menuTrack.user?.name;
+                                            if (artistName) {
+                                                navigate(`/search?q=${encodeURIComponent(artistName)}`);
+                                            }
                                         }
                                     }
                                     setActiveMenu(null);
@@ -898,7 +1049,25 @@ const Profile = () => {
                                 <User size={16} />
                                 Go to Artist
                             </button>
-                            <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left">
+                            <button
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                                onClick={() => {
+                                    if (activeMenu?.track) {
+                                        const shareUrl = `${window.location.origin}/track/${activeMenu.track.id}`;
+                                        navigator.clipboard.writeText(shareUrl);
+                                        const Toast = Swal.mixin({
+                                            toast: true,
+                                            position: 'top-end',
+                                            showConfirmButton: false,
+                                            timer: 2000,
+                                            background: '#1a1a1a',
+                                            color: '#fff'
+                                        });
+                                        Toast.fire({ icon: 'success', title: 'Link copied to clipboard' });
+                                    }
+                                    setActiveMenu(null);
+                                }}
+                            >
                                 <Share2 size={16} />
                                 Share
                             </button>

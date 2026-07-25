@@ -9,6 +9,7 @@ interface PlaylistModalProps {
     initialDescription?: string;
     initialPublic?: boolean;
     onSave: (title: string, description: string, isPublic: boolean) => Promise<void>;
+    onDelete?: () => Promise<void>;
 }
 
 const PlaylistModal: React.FC<PlaylistModalProps> = ({
@@ -18,7 +19,8 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
     initialTitle = '',
     initialDescription = '',
     initialPublic = true,
-    onSave
+    onSave,
+    onDelete
 }) => {
     const [title, setTitle] = useState(initialTitle);
     const [description, setDescription] = useState(initialDescription || '');
@@ -122,6 +124,18 @@ const PlaylistModal: React.FC<PlaylistModalProps> = ({
                                 <div className="w-11 h-6 bg-[#3a3a3c] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#34c759]"></div>
                             </label>
                         </div>
+
+                        {/* Delete Button (Edit Mode Only) */}
+                        {mode === 'edit' && onDelete && (
+                            <div className="pt-2">
+                                <button
+                                    onClick={onDelete}
+                                    className="w-full py-3 rounded-xl bg-red-500/10 text-red-500 font-bold text-[15px] hover:bg-red-500/20 transition-colors border border-red-500/10"
+                                >
+                                    Delete Playlist
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 

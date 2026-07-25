@@ -13,6 +13,7 @@ class Artist extends Model
         'stage_name', // Mapped to 'name' logically
         'slug',
         'avatar', // Mapped from 'image_url'
+        'banner_image',
         'artist_bio', // Mapped from 'bio'
         'user_id'
     ];
@@ -29,5 +30,10 @@ class Artist extends Model
     public function tracks()
     {
         return $this->hasMany(Track::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

@@ -14,7 +14,7 @@ class AuthController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'nullable|string|max:255',
-            'username' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:users',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'dob' => 'required|date',
@@ -76,8 +76,11 @@ class AuthController extends Controller
         ], 200);
     }
 
-    public function redirectToGoogle()
+    public function redirectToGoogle(Request $request)
     {
+        $frontendUrl = $request->query('frontend_url', 'http://localhost:5173');
+        session(['frontend_url' => $frontendUrl]);
+
         return \Laravel\Socialite\Facades\Socialite::driver('google')
             ->with(['prompt' => 'select_account'])
             ->redirect();
@@ -88,6 +91,9 @@ class AuthController extends Controller
         try {
             $googleUser = \Laravel\Socialite\Facades\Socialite::driver('google')->user();
             $user = User::where('email', $googleUser->getEmail())->first();
+
+            // Get frontend url from session, default to React port
+            $frontendUrl = session('frontend_url', 'http://localhost:5173');
 
             // Try to get location from locale
             $rawUser = $googleUser->user;
@@ -103,7 +109,7 @@ class AuthController extends Controller
 
             if (!$user) {
                 // User does not exist, redirect to frontend registration page
-                $redirectUrl = "http://localhost:5173/create-account" .
+                $redirectUrl = rtrim($frontendUrl, '/') . "/create-account" .
                     "?google_pending=true" .
                     "&email=" . urlencode($googleUser->getEmail()) .
                     "&name=" . urlencode($googleUser->getName()) .
@@ -121,25 +127,9 @@ class AuthController extends Controller
                 
                 if (empty($user->location) && $location) $dataToUpdate['location'] = $location;
                 
-                // Fix for unique name collision
+                // Set name from Google if current name is empty (No uniqueness check for Display Name)
                 if (empty($user->name)) {
-                    $googleName = $googleUser->getName();
-                    $newName = $googleName;
-                    $counter = 1;
-
-                    // Check if name exists for ANY other user
-                    while (User::where('name', $newName)->where('id', '!=', $user->id)->exists()) {
-                        $newName = $googleName . ' ' . $counter;
-                        $counter++;
-                    }
-                    $dataToUpdate['name'] = $newName;
-                } else {
-                    // Update name if current name is just a placeholder or if we want to sync (Optional: usually better to keep user's chosen name if not empty)
-                    // But if we MUST update it:
-                    if (!isset($dataToUpdate['name']) && $request->has('force_update_name')) { 
-                         // Logic if needed, for now we only update if empty as per original logic, 
-                         // but with uniqueness check above.
-                    }
+                    $dataToUpdate['name'] = $googleUser->getName();
                 }
 
                 $user->update($dataToUpdate);
@@ -152,7 +142,7 @@ class AuthController extends Controller
             $artist = $user->artist;
 
             // Redirect with user details (Login Success) AND Token
-            $redirectUrl = "http://localhost:5173?login_success=true" .
+            $redirectUrl = rtrim($frontendUrl, '/') . "?login_success=true" .
                 "&username=" . urlencode($user->username) .
                 "&name=" . urlencode($user->name) .
                 "&avatar=" . urlencode($user->avatar) .
@@ -178,7 +168,8 @@ class AuthController extends Controller
 
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Google Login Error: ' . $e->getMessage());
-            return redirect("http://localhost:5173?error=google_login_failed&message=" . urlencode($e->getMessage()));
+            $frontendUrl = session('frontend_url', 'http://localhost:5173');
+            return redirect(rtrim($frontendUrl, '/') . "?error=google_login_failed&message=" . urlencode($e->getMessage()));
         }
     }
 
@@ -207,7 +198,7 @@ class AuthController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
-                'name' => ['nullable', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
+                'name' => ['nullable', 'string', 'max:255'],
                 // 'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)], // Made optional below
                 'dob' => 'nullable|date',
                 'gender' => ['nullable', Rule::in(['Male', 'Female', 'Non-binary', 'Prefer not to say'])],
@@ -247,8 +238,33 @@ class AuthController extends Controller
             if ($request->has('gender')) $user->gender = $request->gender;
             if ($request->has('location')) $user->location = $request->location;
             if ($request->has('bio')) $user->artist_bio = $request->bio;
+
+            // New Fields
+            if ($request->filled('location_city')) $user->location_city = $request->location_city;
+            if ($request->filled('location_country')) $user->location_country = $request->location_country;
+            if ($request->filled('primary_genre')) $user->primary_genre = $request->primary_genre;
+            
+            if ($request->has('secondary_genres')) {
+                // Ensure it's an array for the 'array' cast to work, or allow it to be auto-cast if JSON
+                $user->secondary_genres = $request->secondary_genres;
+            }
+
+            // Socials (Flattened columns in User table check? User table had social_instagram etc in fillable)
+            if ($request->filled('social_instagram')) $user->social_instagram = $request->social_instagram;
+            if ($request->filled('social_spotify')) $user->social_spotify = $request->social_spotify;
+            if ($request->filled('social_youtube')) $user->social_youtube = $request->social_youtube;
+            if ($request->filled('social_soundcloud')) $user->social_soundcloud = $request->social_soundcloud;
+            if ($request->filled('social_apple')) $user->social_apple = $request->social_apple;
             
             $user->save();
+
+            // Sync with Artist table if exists
+            if ($user->artist) {
+                $user->artist->update([
+                    'stage_name' => $user->stage_name ?? $user->name,
+                    'artist_bio' => $user->artist_bio
+                ]);
+            }
 
             return response()->json([
                 'message' => 'Profile updated successfully',
@@ -260,8 +276,11 @@ class AuthController extends Controller
             return response()->json(['message' => 'Internal Server Error', 'error' => $e->getMessage()], 500);
         }
     }
-    public function redirectToFacebook()
+    public function redirectToFacebook(Request $request)
     {
+        $frontendUrl = $request->query('frontend_url', 'http://localhost:5173');
+        session(['frontend_url' => $frontendUrl]);
+
         return \Laravel\Socialite\Facades\Socialite::driver('facebook')->redirect();
     }
 
@@ -271,9 +290,12 @@ class AuthController extends Controller
             $facebookUser = \Laravel\Socialite\Facades\Socialite::driver('facebook')->user();
             $user = User::where('email', $facebookUser->getEmail())->first();
 
+            // Get frontend url from session, default to React port
+            $frontendUrl = session('frontend_url', 'http://localhost:5173');
+
             if (!$user) {
                 // User does not exist, redirect to frontend registration page
-                $redirectUrl = "http://localhost:5173/create-account" .
+                $redirectUrl = rtrim($frontendUrl, '/') . "/create-account" .
                     "?facebook_pending=true" .
                     "&email=" . urlencode($facebookUser->getEmail()) .
                     "&name=" . urlencode($facebookUser->getName()) .
@@ -301,7 +323,7 @@ class AuthController extends Controller
             $artist = $user->artist;
 
             // Redirect with user details (Login Success) AND Token
-            $redirectUrl = "http://localhost:5173?login_success=true" .
+            $redirectUrl = rtrim($frontendUrl, '/') . "?login_success=true" .
                 "&username=" . urlencode($user->username) .
                 "&name=" . urlencode($user->name) .
                 "&avatar=" . urlencode($user->avatar) .
@@ -316,7 +338,8 @@ class AuthController extends Controller
 
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Facebook Login Error: ' . $e->getMessage());
-            return redirect("http://localhost:5173?error=facebook_login_failed&message=" . urlencode($e->getMessage()));
+            $frontendUrl = session('frontend_url', 'http://localhost:5173');
+            return redirect(rtrim($frontendUrl, '/') . "?error=facebook_login_failed&message=" . urlencode($e->getMessage()));
         }
     }
 }

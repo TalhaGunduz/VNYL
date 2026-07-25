@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import Swal from 'sweetalert2';
 
 interface Track {
     id: number;
@@ -26,6 +27,10 @@ interface Track {
         slug: string;
         stage_name: string;
     };
+    user?: {
+        id: number;
+        name: string;
+    };
 }
 
 interface PlayerContextType {
@@ -35,7 +40,10 @@ interface PlayerContextType {
     currentTime: number;
     duration: number;
     volume: number;
-    playTrack: (track: Track) => void;
+    queue: Track[]; // Added queue
+    playTrack: (track: Track, queue?: Track[]) => void; // Updated signature
+    playNext: () => void; // Added
+    playPrevious: () => void; // Added
     togglePlay: () => void;
     setIsExpanded: (expanded: boolean) => void;
     seek: (time: number) => void;
@@ -44,6 +52,7 @@ interface PlayerContextType {
     toggleLike: () => void;
     setCurrentTime: (time: number) => void;
     setDuration: (duration: number) => void;
+    setQueue: (queue: Track[]) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -56,6 +65,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [duration, setDuration] = useState(0);
     const [volume, setVolume] = useState(1);
     const [isVisible, setIsVisible] = useState(true);
+    const [queue, setQueue] = useState<Track[]>([]); // Added queue state
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const location = useLocation();
@@ -101,7 +111,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const updateTime = () => setCurrentTime(audio.currentTime);
         const updateDuration = () => setDuration(audio.duration);
         const onEnded = () => {
+            // Auto-play next logic is handled in MusicPlayer or here
+            // Ideally here for better abstraction, but MusicPlayer handles YouTube vs Audio
+            // For now, let's trigger playNext if not YouTube, OR expose a callback.
+            // Actually, simplest is to let MusicPlayer handle 'playNext' trigger on 'onEnded'
             setIsPlaying(false);
+            playNext(); // Try to play next
         };
 
         audio.addEventListener('timeupdate', updateTime);
@@ -113,15 +128,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             audio.removeEventListener('loadedmetadata', updateDuration);
             audio.removeEventListener('ended', onEnded);
         };
-    }, []);
+    }, [queue, currentTrack]); // Re-bind when queue changes
 
     // Helper to play a specific track
-    const playTrack = (track: Track) => {
+    const playTrack = (track: Track, newQueue?: Track[]) => {
+        if (newQueue) {
+            setQueue(newQueue);
+        }
+
         // If it's a YouTube track, just set state and let the UI component handle the player
         if (track.youtube_video_id) {
             if (audioRef.current) {
                 audioRef.current.pause(); // Stop any existing audio
                 audioRef.current.currentTime = 0;
+            }
+            if (currentTrack?.id !== track.id) {
+                // Increment Play Count
+                fetch(`http://127.0.0.1:8000/api/tracks/${track.id}/play`, { method: 'POST' }).catch(e => console.error(e));
             }
             setCurrentTrack(track);
             setIsPlaying(true);
@@ -137,15 +160,40 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return;
         }
 
-        // New local track
-        audio.src = `http://127.0.0.1:8000/storage/${track.file_path}`;
+        // New local track - Use stream endpoint for Safari support (Range Requests)
+        const filename = track.file_path ? track.file_path.replace('tracks/', '') : '';
+        audio.src = `http://127.0.0.1:8000/api/tracks/stream/${filename}`;
         audio.volume = volume;
         audio.play().then(() => {
             setIsPlaying(true);
+            // Increment Play Count
+            fetch(`http://127.0.0.1:8000/api/tracks/${track.id}/play`, { method: 'POST' }).catch(e => console.error(e));
         }).catch(e => console.error("Playback failed", e));
 
         setCurrentTrack(track);
     };
+
+    const playNext = () => {
+        if (!queue.length || !currentTrack) return;
+        const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
+        if (currentIndex >= 0 && currentIndex < queue.length - 1) {
+            playTrack(queue[currentIndex + 1]);
+        } else {
+            setIsPlaying(false); // End of queue
+        }
+    };
+
+    const playPrevious = () => {
+        if (!queue.length || !currentTrack) return;
+        const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
+        if (currentIndex > 0) {
+            playTrack(queue[currentIndex - 1]);
+        } else {
+            // Optionally restart current track
+            seek(0);
+        }
+    };
+
 
     // Helper to toggle play/pause
     const togglePlay = () => {
@@ -170,14 +218,69 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const toggleLike = async () => {
         if (!currentTrack) return;
 
+        const token = localStorage.getItem('token');
+        if (!token) {
+            Swal.fire({
+                title: 'Giriş Gerekli',
+                text: 'Şarkıları beğenmek için giriş yapmalısınız.',
+                icon: 'info',
+                showCancelButton: true,
+                confirmButtonText: 'Giriş Yap',
+                cancelButtonText: 'İptal',
+                background: '#161616',
+                color: '#fff',
+                confirmButtonColor: '#FF6B00',
+                cancelButtonColor: '#333',
+                customClass: {
+                    popup: 'rounded-[24px]',
+                    confirmButton: 'rounded-full px-6 py-2',
+                    cancelButton: 'rounded-full px-6 py-2'
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = '/login';
+                }
+            });
+            return;
+        }
+
         try {
             const response = await fetch(`http://127.0.0.1:8000/api/tracks/${currentTrack.id}/like`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 }
             });
+
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.dispatchEvent(new Event('storage'));
+                Swal.fire({
+                    title: 'Giriş Gerekli',
+                    text: 'Şarkıları beğenmek için giriş yapmalısınız.',
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonText: 'Giriş Yap',
+                    cancelButtonText: 'İptal',
+                    background: '#161616',
+                    color: '#fff',
+                    confirmButtonColor: '#FF6B00',
+                    cancelButtonColor: '#333',
+                    customClass: {
+                        popup: 'rounded-[24px]',
+                        confirmButton: 'rounded-full px-6 py-2',
+                        cancelButton: 'rounded-full px-6 py-2'
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = '/login';
+                    }
+                });
+                return;
+            }
+
             const data = await response.json();
 
             if (data.status === 'success') {
@@ -210,7 +313,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             currentTime,
             duration,
             volume,
+            queue, // Expose
             playTrack,
+            playNext, // Expose
+            playPrevious, // Expose
             togglePlay,
             setIsExpanded,
             seek,
@@ -218,7 +324,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             isVisible,
             toggleLike,
             setCurrentTime, // Export this
-            setDuration // Export this
+            setDuration, // Export this
+            setQueue
         }}>
             {children}
         </PlayerContext.Provider>
@@ -232,3 +339,4 @@ export const usePlayer = () => {
     }
     return context;
 };
+

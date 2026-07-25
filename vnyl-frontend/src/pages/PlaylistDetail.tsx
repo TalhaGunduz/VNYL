@@ -75,14 +75,54 @@ const PlaylistDetail = () => {
                     position: 'top-end',
                     showConfirmButton: false,
                     timer: 2000,
-                    background: 'rgba(20, 20, 20, 0.9)',
+                    background: '#1c1c1e', // Darker background
                     color: '#fff',
                     customClass: { popup: 'backdrop-blur-md border border-white/10' }
                 });
-                Toast.fire({ icon: 'success', title: 'Start Settings Updated' });
+                Toast.fire({ icon: 'success', title: 'Settings Updated' });
             }
         } catch (error) {
             console.error(error);
+        }
+    };
+
+    const handleDeletePlaylist = async () => {
+        const result = await Swal.fire({
+            title: 'Delete Playlist?',
+            text: "You won't be able to revert this!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, delete it!',
+            background: '#1c1c1e',
+            color: '#fff'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/api/playlists/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    await Swal.fire({
+                        title: 'Deleted!',
+                        text: 'Your playlist has been deleted.',
+                        icon: 'success',
+                        background: '#1c1c1e',
+                        color: '#fff',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    navigate('/profile');
+                }
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Error', 'Failed to delete playlist', 'error');
+            }
         }
     };
 
@@ -145,18 +185,45 @@ const PlaylistDetail = () => {
                 <div className="flex flex-col md:flex-row gap-8 items-end">
                     {/* Art */}
                     <div className="w-52 h-52 md:w-64 md:h-64 bg-[#1c1c1e] rounded-xl shadow-2xl flex items-center justify-center relative overflow-hidden group border border-white/5">
-                        {playlist.tracks && playlist.tracks.filter((t: any) => t.cover_path).length >= 4 ? (
-                            <div className="grid grid-cols-2 w-full h-full">
-                                {playlist.tracks.filter((t: any) => t.cover_path || t.cover_image).slice(0, 4).map((t: any, i: number) => (
-                                    <img
-                                        key={i}
-                                        src={t.cover_image || `http://127.0.0.1:8000/storage/${t.cover_path}`}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ))}
-                            </div>
-                        ) : playlist.tracks && playlist.tracks.find((t: any) => t.cover_path) ? (
-                            <img src={`http://127.0.0.1:8000/storage/${playlist.tracks.find((t: any) => t.cover_path).cover_path}`} className="w-full h-full object-cover" />
+                        {playlist.tracks && playlist.tracks.length > 0 ? (
+                            playlist.tracks.length === 1 ? (
+                                <img
+                                    src={playlist.tracks[0].cover_image || (playlist.tracks[0].cover_path ? `http://127.0.0.1:8000/storage/${playlist.tracks[0].cover_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(playlist.tracks[0].title)}&background=random`)}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : playlist.tracks.length === 2 ? (
+                                <div className="grid grid-cols-2 w-full h-full">
+                                    {playlist.tracks.map((track: any, i: number) => (
+                                        <img
+                                            key={i}
+                                            src={track.cover_image || (track.cover_path ? `http://127.0.0.1:8000/storage/${track.cover_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(track.title)}&background=random`)}
+                                            className="w-full h-full object-cover border-r border-[#1c1c1e] last:border-r-0"
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                // 3 or 4+ tracks -> 2x2 Grid
+                                <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
+                                    {Array.from({ length: 4 }).map((_, i) => {
+                                        const track = playlist.tracks[i];
+                                        if (track) {
+                                            return (
+                                                <img
+                                                    key={i}
+                                                    src={track.cover_image || (track.cover_path ? `http://127.0.0.1:8000/storage/${track.cover_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(track.title)}&background=random`)}
+                                                    className="w-full h-full object-cover border-[0.5px] border-[#1c1c1e]"
+                                                />
+                                            );
+                                        } else {
+                                            return (
+                                                <div key={i} className="w-full h-full bg-[#2c2c2e] border-[0.5px] border-[#1c1c1e] flex items-center justify-center">
+                                                    <Music size={24} className="text-white/5" />
+                                                </div>
+                                            );
+                                        }
+                                    })}
+                                </div>
+                            )
                         ) : (
                             <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-gray-900 flex items-center justify-center">
                                 <Music size={64} className="text-white/20" />
@@ -218,6 +285,7 @@ const PlaylistDetail = () => {
                 initialDescription={playlist.description}
                 initialPublic={playlist.is_public === 1 || playlist.is_public === true}
                 onSave={savePlaylistChanges}
+                onDelete={handleDeletePlaylist}
             />
 
             {/* Content */}
@@ -230,7 +298,7 @@ const PlaylistDetail = () => {
                             <div key={track.id} className="group flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group">
                                 <div className="w-8 text-center text-white/40 group-hover:hidden">{idx + 1}</div>
                                 <div className="w-8 hidden group-hover:flex items-center justify-center">
-                                    <button onClick={() => playTrack(track)}>
+                                    <button onClick={() => playTrack(track, playlist.tracks)}>
                                         {currentTrack?.id === track.id && isPlaying ? <Pause size={16} className="text-[var(--accent)]" /> : <Play size={16} className="text-white" />}
                                     </button>
                                 </div>

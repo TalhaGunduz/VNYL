@@ -21,6 +21,8 @@ import {
     Music,
     Music2
 } from 'lucide-react';
+import SearchableSelect from '../components/SearchableSelect';
+import { GENRES, COUNTRIES, CITIES } from '../constants/profile-data';
 import Swal from 'sweetalert2';
 
 const BecomeArtist = () => {
@@ -45,24 +47,9 @@ const BecomeArtist = () => {
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState('');
     const [primaryGenre, setPrimaryGenre] = useState('');
-    const [secondaryGenres, setSecondaryGenres] = useState<string[]>([]);
-    const [bio, setBio] = useState('');
     const [location, setLocation] = useState({ city: '', country: '' });
-    const [socials, setSocials] = useState({
-        spotify: '',
-        apple: '',
-        soundcloud: '',
-        instagram: '',
-        youtube: ''
-    });
-    const [careerStatus, setCareerStatus] = useState('');
     const [termsAccepted, setTermsAccepted] = useState(false);
 
-    const genres = [
-        "Hip-Hop", "Pop", "Electronic", "Rock", "Indie",
-        "Jazz", "R&B", "Latin", "Metal", "Classical",
-        "Folk", "Reggae", "Alternative", "Country", "Blues"
-    ];
 
     // Initialize User
     useEffect(() => {
@@ -207,19 +194,10 @@ const BecomeArtist = () => {
         }
     };
 
-    const handleRemoveAvatar = () => {
-        setAvatarFile(null);
-        setAvatarPreview(''); // Show placeholder
-    };
+    const [bio, setBio] = useState('');
 
     const toggleSecondaryGenre = (g: string) => {
-        if (secondaryGenres.includes(g)) {
-            setSecondaryGenres(prev => prev.filter(item => item !== g));
-        } else {
-            if (secondaryGenres.length < 2) {
-                setSecondaryGenres(prev => [...prev, g]);
-            }
-        }
+        // Function removed as requested
     };
 
     const handleFinalSubmit = async (e: React.FormEvent) => {
@@ -236,11 +214,11 @@ const BecomeArtist = () => {
             return;
         }
 
-        if (!stageName || !primaryGenre || !careerStatus || !bio || bio.length < 10) {
+        if (!stageName || !primaryGenre || !bio || bio.length < 10) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Incomplete Form',
-                text: 'Please fill in all required fields (Name, Genre, Status, Bio) and ensure bio is at least 10 characters.',
+                text: 'Please fill in all required fields (Name, Genre, Bio) and ensure bio is at least 10 characters.',
                 background: '#18181b',
                 color: '#fff'
             });
@@ -256,12 +234,12 @@ const BecomeArtist = () => {
                 stage_name: stageName,
                 bio,
                 primary_genre: primaryGenre,
-                secondary_genres: secondaryGenres, // Backend expects array/list
+                secondary_genres: [],
                 location_city: location.city,
                 location_country: location.country,
-                socials,
-                career_status: careerStatus,
-                avatar: avatarPreview // Sending URL/DataURL. If file upload needed, logic changes.
+                socials: { spotify: '', apple: '', soundcloud: '', instagram: '', youtube: '' },
+                career_status: 'Independent',
+                avatar: avatarPreview
             };
 
             const response = await fetch('http://127.0.0.1:8000/api/artist/verify-and-upgrade', {
@@ -539,15 +517,6 @@ const BecomeArtist = () => {
                                                     />
                                                 </div>
                                             </div>
-                                            {avatarPreview && (
-                                                <button
-                                                    type="button"
-                                                    onClick={handleRemoveAvatar}
-                                                    className="text-xs text-red-500 font-bold hover:underline"
-                                                >
-                                                    Remove
-                                                </button>
-                                            )}
                                             {!avatarPreview && <span className="text-[10px] text-white/30 uppercase font-bold">Profile Image</span>}
                                         </div>
 
@@ -564,31 +533,17 @@ const BecomeArtist = () => {
                                                     placeholder="Your Stage Name"
                                                 />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-xs font-bold text-white/40 mb-2 uppercase">Primary Genre <span className="text-[var(--accent)]">*</span></label>
-                                                    <select
-                                                        required
-                                                        value={primaryGenre}
-                                                        onChange={(e) => setPrimaryGenre(e.target.value)}
-                                                        className="w-full bg-black/20 border border-white/10 focus:border-[var(--accent)] rounded-xl px-4 py-3 text-white text-sm outline-none transition-colors appearance-none"
-                                                    >
-                                                        <option value="">Select Genre</option>
-                                                        {genres.map(g => <option key={g} value={g} className="bg-[#18181b]">{g}</option>)}
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-white/40 mb-2 uppercase">Career Status</label>
-                                                    <select
-                                                        value={careerStatus}
-                                                        onChange={(e) => setCareerStatus(e.target.value)}
-                                                        className="w-full bg-black/20 border border-white/10 focus:border-[var(--accent)] rounded-xl px-4 py-3 text-white text-sm outline-none transition-colors appearance-none"
-                                                    >
-                                                        <option value="">Select Status</option>
-                                                        <option value="Independent" className="bg-[#18181b]">Independent</option>
-                                                        <option value="Signed" className="bg-[#18181b]">Signed Label</option>
-                                                    </select>
-                                                </div>
+                                            <div className="w-full">
+                                                <label className="block text-xs font-bold text-white/40 mb-2 uppercase">Primary Genre <span className="text-[var(--accent)]">*</span></label>
+                                                <select
+                                                    required
+                                                    value={primaryGenre}
+                                                    onChange={(e) => setPrimaryGenre(e.target.value)}
+                                                    className="w-full bg-black/20 border border-white/10 focus:border-[var(--accent)] rounded-xl px-4 py-3 text-white text-sm outline-none transition-colors appearance-none"
+                                                >
+                                                    <option value="">Select Genre</option>
+                                                    {GENRES.map(g => <option key={g} value={g} className="bg-[#18181b]">{g}</option>)}
+                                                </select>
                                             </div>
                                         </div>
                                     </div>
@@ -615,80 +570,28 @@ const BecomeArtist = () => {
                                         )}
                                     </div>
 
-                                    {/* 3. Secondary Genres (Chips) */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-white/40 mb-3 uppercase">Secondary Genres (Max 2)</label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {genres.map(g => (
-                                                <button
-                                                    key={g}
-                                                    type="button"
-                                                    onClick={() => toggleSecondaryGenre(g)}
-                                                    disabled={!secondaryGenres.includes(g) && secondaryGenres.length >= 2}
-                                                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${secondaryGenres.includes(g)
-                                                        ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
-                                                        : 'bg-transparent border-white/10 text-white/60 hover:border-white/30 disabled:opacity-30 disabled:cursor-not-allowed'
-                                                        }`}
-                                                >
-                                                    {g}
-                                                </button>
-                                            ))}
+                                    {/* 3. Location */}
+                                    <div className="space-y-4">
+                                        <label className="block text-xs font-bold text-white/40 uppercase border-b border-white/5 pb-2">Location</label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <SearchableSelect
+                                                label="Country"
+                                                options={COUNTRIES}
+                                                value={location.country}
+                                                onChange={(val) => setLocation({ country: val, city: '' })}
+                                                placeholder="Country"
+                                            />
+                                            <SearchableSelect
+                                                label="City"
+                                                options={location.country ? (CITIES[location.country] || CITIES['Default']) : []}
+                                                value={location.city}
+                                                onChange={(val) => setLocation({ ...location, city: val })}
+                                                placeholder="City"
+                                                disabled={!location.country}
+                                            />
                                         </div>
                                     </div>
 
-                                    {/* 4. Location & Links */}
-                                    <div className="grid md:grid-cols-2 gap-6">
-                                        <div className="space-y-4">
-                                            <label className="block text-xs font-bold text-white/40 uppercase border-b border-white/5 pb-2">Location</label>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="relative">
-                                                    <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-                                                    <input
-                                                        type="text"
-                                                        value={location.city}
-                                                        onChange={(e) => setLocation({ ...location, city: e.target.value })}
-                                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white outline-none focus:border-white/30"
-                                                        placeholder="City"
-                                                    />
-                                                </div>
-                                                <input
-                                                    type="text"
-                                                    value={location.country}
-                                                    onChange={(e) => setLocation({ ...location, country: e.target.value })}
-                                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-white/30"
-                                                    placeholder="Country"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            <label className="block text-xs font-bold text-white/40 uppercase border-b border-white/5 pb-2">Socials</label>
-                                            <div className="space-y-2">
-                                                <div className="relative">
-                                                    <Instagram size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-                                                    <input
-                                                        type="text"
-                                                        value={socials.instagram}
-                                                        onChange={(e) => setSocials({ ...socials, instagram: e.target.value })}
-                                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white outline-none focus:border-white/30"
-                                                        placeholder="Instagram username"
-                                                    />
-                                                </div>
-                                                <div className="relative">
-                                                    <Music2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-                                                    <input
-                                                        type="text"
-                                                        value={socials.spotify}
-                                                        onChange={(e) => setSocials({ ...socials, spotify: e.target.value })}
-                                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white outline-none focus:border-white/30"
-                                                        placeholder="Spotify Artist URL"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Action */}
                                     {/* Terms & Conditions */}
                                     <div className="pt-4 border-t border-white/5">
                                         <label className="flex items-start gap-3 cursor-pointer group">

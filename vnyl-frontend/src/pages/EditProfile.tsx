@@ -1,7 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, User as UserIcon, Mail, MapPin, Calendar } from 'lucide-react';
+import {
+    ArrowLeft,
+    Save,
+    User as UserIcon,
+    Mail,
+    MapPin,
+    Calendar,
+    Music2,
+    Globe,
+    Instagram,
+    Music,
+    Search,
+    ChevronDown,
+    X
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
+import SearchableSelect from '../components/SearchableSelect';
+import { GENRES, COUNTRIES, CITIES } from '../constants/profile-data';
 
 const EditProfile = () => {
     const navigate = useNavigate();
@@ -12,7 +29,17 @@ const EditProfile = () => {
         username: '',
         location: '',
         bio: '',
-        website: ''
+        website: '',
+        // New Fields
+        primary_genre: '',
+        secondary_genres: [] as string[],
+        location_city: '',
+        location_country: '',
+        social_instagram: '',
+        social_spotify: '',
+        social_youtube: '',
+        social_soundcloud: '',
+        social_apple: ''
     });
 
     useEffect(() => {
@@ -24,15 +51,26 @@ const EditProfile = () => {
                 name: parsedUser.name || '',
                 username: parsedUser.username || '',
                 location: parsedUser.location || '',
-                bio: parsedUser.bio || '',
-                website: parsedUser.website || ''
+                bio: parsedUser.artist_bio || parsedUser.bio || '',
+                website: parsedUser.website || '',
+
+                primary_genre: parsedUser.primary_genre || (parsedUser.artist?.primary_genre) || '',
+                secondary_genres: parsedUser.secondary_genres || (parsedUser.artist?.secondary_genres) || [],
+                location_city: parsedUser.location_city || '',
+                location_country: parsedUser.location_country || '',
+
+                social_instagram: parsedUser.social_instagram || '',
+                social_spotify: parsedUser.social_spotify || '',
+                social_youtube: parsedUser.social_youtube || '',
+                social_soundcloud: parsedUser.social_soundcloud || '',
+                social_apple: parsedUser.social_apple || ''
             });
         } else {
             navigate('/login');
         }
     }, [navigate]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         let value = e.target.value;
 
         // Username constraints
@@ -70,6 +108,20 @@ const EditProfile = () => {
             data.append('avatar', avatarFile);
         }
 
+        // Append New Fields
+        data.append('location_city', formData.location_city);
+        data.append('location_country', formData.location_country);
+        data.append('primary_genre', formData.primary_genre);
+
+        // Handle array for secondary genres
+        formData.secondary_genres.forEach((g, i) => data.append(`secondary_genres[${i}]`, g));
+
+        data.append('social_instagram', formData.social_instagram);
+        data.append('social_spotify', formData.social_spotify);
+        data.append('social_youtube', formData.social_youtube);
+        data.append('social_soundcloud', formData.social_soundcloud);
+        data.append('social_apple', formData.social_apple);
+
         // LARAVEL PUT TRICK
         data.append('_method', 'PUT');
 
@@ -88,7 +140,7 @@ const EditProfile = () => {
 
             // Using /api/artist/profile as agreed for artist updates, or generic /api/update-profile as per user snippet
             // Let's use /api/update-profile to match user snippet exactly.
-            const response = await fetch('http://127.0.0.1:8000/api/update-profile', {
+            const response = await fetch('http://127.0.0.1:8000/api/user/profile', {
                 method: 'POST', // Important: POST for FormData
                 headers: headers,
                 credentials: 'include', // Important for Sanctum/Cookies
@@ -240,6 +292,131 @@ const EditProfile = () => {
                                 className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-4 focus:outline-none focus:border-accent transition-colors resize-none"
                                 placeholder="Tell us about yourself..."
                             />
+                        </div>
+
+
+                        {/* Genres Section */}
+                        <div className="space-y-4 pt-4 border-t border-white/5">
+                            <h3 className="text-sm font-bold text-white/70 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <Music2 size={14} /> Artist Details
+                            </h3>
+                            <div className="grid md:grid-cols-2 gap-6">
+                                <SearchableSelect
+                                    label="Primary Genre"
+                                    placeholder="Select Main Genre"
+                                    options={GENRES}
+                                    value={formData.primary_genre}
+                                    onChange={(val) => setFormData(prev => ({ ...prev, primary_genre: val }))}
+                                />
+
+                                <div className="space-y-2">
+                                    <SearchableSelect
+                                        label="Secondary Genres"
+                                        placeholder="Add Sub-Genre..."
+                                        options={GENRES.filter(g => g !== formData.primary_genre && !formData.secondary_genres.includes(g))}
+                                        value=""
+                                        onChange={(val) => {
+                                            if (formData.secondary_genres.length < 3) {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    secondary_genres: [...prev.secondary_genres, val]
+                                                }));
+                                            }
+                                        }}
+                                    />
+                                    <div className="flex flex-wrap gap-2 mt-2 min-h-[28px]">
+                                        {formData.secondary_genres.map(genre => (
+                                            <button
+                                                key={genre}
+                                                type="button"
+                                                onClick={() => setFormData(prev => ({
+                                                    ...prev,
+                                                    secondary_genres: prev.secondary_genres.filter(g => g !== genre)
+                                                }))}
+                                                className="flex items-center gap-1.5 px-3 py-1 bg-accent border border-accent/20 rounded-full text-[10px] font-bold text-white shadow-[0_2px_8px_rgba(var(--accent-rgb),0.3)] hover:scale-105 transition-transform"
+                                            >
+                                                {genre.toUpperCase()}
+                                                <X size={10} />
+                                            </button>
+                                        ))}
+                                        {formData.secondary_genres.length === 0 && (
+                                            <span className="text-[10px] text-white/10 italic py-1">No sub-genres added (max 3)</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Detailed Location */}
+                        <div className="grid md:grid-cols-2 gap-6 pt-4 border-t border-white/5">
+                            <SearchableSelect
+                                label="Country"
+                                placeholder="Select Country"
+                                options={COUNTRIES}
+                                value={formData.location_country}
+                                onChange={(val) => setFormData(prev => ({ ...prev, location_country: val, location_city: '' }))}
+                            />
+                            <SearchableSelect
+                                label="City"
+                                placeholder="Select City"
+                                disabled={!formData.location_country}
+                                options={CITIES[formData.location_country] || CITIES['Default']}
+                                value={formData.location_city}
+                                onChange={(val) => setFormData(prev => ({ ...prev, location_city: val }))}
+                            />
+                        </div>
+
+                        {/* Socials Section */}
+                        <div className="space-y-4 pt-4 border-t border-white/5">
+                            <h3 className="text-sm font-bold text-white/70 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <Globe size={14} /> Social Links
+                            </h3>
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="relative">
+                                    <Instagram className="absolute top-1/2 -translate-y-1/2 left-3 text-pink-500" size={18} />
+                                    <input
+                                        type="text"
+                                        name="social_instagram"
+                                        value={formData.social_instagram}
+                                        onChange={handleChange}
+                                        placeholder="Instagram Username"
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-white placeholder:text-white/20 focus:outline-none focus:border-pink-500 transition-colors"
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <Music2 className="absolute top-1/2 -translate-y-1/2 left-3 text-green-500" size={18} />
+                                    <input
+                                        type="text"
+                                        name="social_spotify"
+                                        value={formData.social_spotify}
+                                        onChange={handleChange}
+                                        placeholder="Spotify Artist ID"
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-white placeholder:text-white/20 focus:outline-none focus:border-green-500 transition-colors"
+                                    />
+                                </div>
+                                <div className="relative">
+                                    < Globe className="absolute top-1/2 -translate-y-1/2 left-3 text-red-500" size={18} />
+                                    <input
+                                        type="text"
+                                        name="social_youtube"
+                                        value={formData.social_youtube}
+                                        onChange={handleChange}
+                                        placeholder="YouTube URL"
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-white placeholder:text-white/20 focus:outline-none focus:border-red-500 transition-colors"
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <Music className="absolute top-1/2 -translate-y-1/2 left-3 text-orange-500" size={18} />
+                                    <input
+                                        type="text"
+                                        name="social_soundcloud"
+                                        value={formData.social_soundcloud}
+                                        onChange={handleChange}
+                                        placeholder="SoundCloud URL"
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-white placeholder:text-white/20 focus:outline-none focus:border-orange-500 transition-colors"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
 

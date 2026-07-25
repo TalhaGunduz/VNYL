@@ -1,7 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Save, Instagram, Globe, MessageCircle, Music, MapPin, User, Music2 } from 'lucide-react';
+import {
+    ArrowLeft,
+    Upload,
+    Save,
+    Instagram,
+    Globe,
+    MessageCircle,
+    Music,
+    MapPin,
+    User,
+    Music2,
+    Youtube,
+    X,
+    ChevronDown,
+    Search
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
+import SearchableSelect from '../components/SearchableSelect';
+import { GENRES, COUNTRIES, CITIES } from '../constants/profile-data';
 
 const ArtistProfileSetup = () => {
     const navigate = useNavigate();
@@ -57,7 +75,6 @@ const ArtistProfileSetup = () => {
                         primary_genre: artist.primary_genre || u.primary_genre || '',
                         secondary_genres: artist.secondary_genres || u.secondary_genres || [],
 
-                        // Socials priority: Artist table > User table
                         social_instagram: artist.social_instagram || u.social_instagram || '',
                         social_spotify: artist.social_spotify || u.social_spotify || '',
                         social_youtube: artist.social_youtube || u.social_youtube || '',
@@ -66,12 +83,10 @@ const ArtistProfileSetup = () => {
                     });
                     setAvatarPreview(artist.avatar || u.avatar || '');
                 } else {
-                    // Fallback to local storage if API fails (though ideally we should handle error)
                     const stored = localStorage.getItem('user');
                     if (stored) {
                         const u = JSON.parse(stored);
                         setUser(u);
-                        // ... same mapping logic ...
                         const artist = u.artist || {};
                         setFormData({
                             stage_name: artist.stage_name || u.stage_name || u.name || '',
@@ -109,9 +124,18 @@ const ArtistProfileSetup = () => {
         }
     };
 
-    const handleGenreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        setFormData({ ...formData, secondary_genres: val.split(',').map(s => s.trim()).filter(s => s) });
+    const handleGenreSelect = (genre: string) => {
+        if (formData.secondary_genres.includes(genre)) {
+            setFormData(prev => ({
+                ...prev,
+                secondary_genres: prev.secondary_genres.filter(g => g !== genre)
+            }));
+        } else if (formData.secondary_genres.length < 3) {
+            setFormData(prev => ({
+                ...prev,
+                secondary_genres: [...prev.secondary_genres, genre]
+            }));
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -181,6 +205,8 @@ const ArtistProfileSetup = () => {
 
     if (!user) return null;
 
+    const availableCities = formData.location_country ? (CITIES[formData.location_country] || CITIES['Default']) : [];
+
     return (
         <div className="min-h-screen bg-[var(--bg)] text-white p-6 pb-20 md:p-10">
             <div className="max-w-4xl mx-auto">
@@ -188,24 +214,27 @@ const ArtistProfileSetup = () => {
                     <ArrowLeft size={20} /> Back to Dashboard
                 </button>
 
-                <div className="bg-[#18181b] border border-white/10 rounded-3xl p-8 md:p-12 shadow-2xl">
-                    <div className="flex items-center gap-4 mb-8">
+                <div className="bg-[#18181b] border border-white/10 rounded-3xl p-8 md:p-12 shadow-2xl relative overflow-hidden">
+                    {/* Background Glow */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)]/5 rounded-full blur-[80px]" />
+
+                    <div className="flex items-center gap-4 mb-10 relative">
                         <div className="p-3 bg-[var(--accent)]/10 text-[var(--accent)] rounded-2xl">
                             <User size={32} />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-black text-white">Complete Artist Profile</h1>
-                            <p className="text-white/50">Fill in all details to maximize your visibility.</p>
+                            <h1 className="text-3xl font-black text-white">Complete Your Artist Identity</h1>
+                            <p className="text-white/50">Maximize your visibility with a complete profile.</p>
                         </div>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-8">
+                    <form onSubmit={handleSubmit} className="space-y-12 relative">
                         {/* Avatar Section */}
                         <div className="flex flex-col items-center">
                             <div className="relative group w-32 h-32">
-                                <div className="w-full h-full rounded-full overflow-hidden border-4 border-[var(--accent)]/30 shadow-2xl">
+                                <div className="w-full h-full rounded-full overflow-hidden border-4 border-[var(--accent)]/30 shadow-2xl transition-transform group-hover:scale-105">
                                     <img
-                                        src={avatarPreview || "https://ui-avatars.com/api/?background=random"}
+                                        src={avatarPreview || `https://ui-avatars.com/api/?name=${formData.stage_name}&background=random`}
                                         alt="Avatar"
                                         className="w-full h-full object-cover"
                                     />
@@ -215,162 +244,171 @@ const ArtistProfileSetup = () => {
                                     <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
                                 </label>
                             </div>
-                            <p className="text-xs text-white/40 mt-3">Click to change profile picture</p>
+                            <p className="text-xs text-white/40 mt-3 font-bold uppercase tracking-wider">Change Profile Picture</p>
                         </div>
 
-                        <div className="grid md:grid-cols-2 gap-8">
-                            {/* Basic Info */}
-                            <div className="space-y-6">
-                                <h3 className="text-sm font-bold text-white/70 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                    <User size={14} /> Basic Info
-                                </h3>
-                                <div>
-                                    <label className="block text-xs font-medium text-white/50 mb-1">Stage Name</label>
+                        {/* Basic Information */}
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-bold text-white uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                <span className="w-6 h-px bg-[var(--accent)]" /> 1. Essentials
+                            </h3>
+                            <div className="grid md:grid-cols-2 gap-6">
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-medium text-white/50">Stage Name</label>
                                     <input
                                         type="text"
                                         name="stage_name"
                                         value={formData.stage_name}
                                         onChange={handleChange}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--accent)] transition-colors"
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--accent)] transition-all"
                                         placeholder="Your artist name"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-white/50 mb-1">Bio (Min 100 chars)</label>
-                                    <textarea
-                                        name="bio"
-                                        value={formData.bio}
-                                        onChange={handleChange}
-                                        rows={6}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--accent)] transition-colors resize-none"
-                                        placeholder="Tell your story..."
-                                    />
-                                    <p className="text-[10px] text-right text-white/30">{formData.bio.length} characters</p>
-                                </div>
+                                <SearchableSelect
+                                    label="Primary Genre"
+                                    options={GENRES}
+                                    value={formData.primary_genre}
+                                    onChange={(val) => setFormData({ ...formData, primary_genre: val })}
+                                    placeholder="Select Genre"
+                                />
                             </div>
-
-                            {/* Details */}
-                            <div className="space-y-6">
-                                <h3 className="text-sm font-bold text-white/70 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                    <MapPin size={14} /> Details
-                                </h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-medium text-white/50 mb-1">City</label>
-                                        <input
-                                            type="text"
-                                            name="location_city"
-                                            value={formData.location_city}
-                                            onChange={handleChange}
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--accent)] transition-colors"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-white/50 mb-1">Country</label>
-                                        <input
-                                            type="text"
-                                            name="location_country"
-                                            value={formData.location_country}
-                                            onChange={handleChange}
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--accent)] transition-colors"
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-white/50 mb-1">Primary Genre</label>
-                                    <select
-                                        name="primary_genre"
-                                        value={formData.primary_genre}
-                                        onChange={handleChange}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--accent)] transition-colors [&>option]:text-black"
-                                    >
-                                        <option value="">Select Genre</option>
-                                        <option value="Pop">Pop</option>
-                                        <option value="Rock">Rock</option>
-                                        <option value="Hip Hop">Hip Hop</option>
-                                        <option value="Electronic">Electronic</option>
-                                        <option value="R&B">R&B</option>
-                                        <option value="Indie">Indie</option>
-                                        <option value="Jazz">Jazz</option>
-                                        <option value="Classical">Classical</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-white/50 mb-1">Secondary Genres (comma separated)</label>
-                                    <input
-                                        type="text"
-                                        name="secondary_genres_input"
-                                        value={formData.secondary_genres.join(', ')}
-                                        onChange={handleGenreChange}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--accent)] transition-colors"
-                                        placeholder="e.g. Trap, Soul, Lo-Fi"
-                                    />
+                            <div>
+                                <label className="block text-xs font-medium text-white/50 mb-1">Artist Bio</label>
+                                <textarea
+                                    name="bio"
+                                    value={formData.bio}
+                                    onChange={handleChange}
+                                    rows={5}
+                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--accent)] transition-all resize-none"
+                                    placeholder="Tell your story to your fans..."
+                                />
+                                <div className="flex justify-between mt-1">
+                                    <span className="text-[10px] text-white/20 italic">Pro-tip: Minimum 100 characters recommended for verification.</span>
+                                    <span className="text-[10px] text-white/30 font-mono tracking-tighter">{formData.bio.length} chars</span>
                                 </div>
                             </div>
                         </div>
 
-                        <hr className="border-white/5" />
+                        {/* Musical Details */}
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-bold text-white uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                <span className="w-6 h-px bg-[var(--accent)]" /> 2. Musical Style
+                            </h3>
+                            <SearchableSelect
+                                label="Add Secondary Genres (Max 3)"
+                                options={GENRES.filter(g => g !== formData.primary_genre)}
+                                value=""
+                                onChange={handleGenreSelect}
+                                placeholder="Choose sub-genres..."
+                            />
+                            {formData.secondary_genres.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mt-4">
+                                    {formData.secondary_genres.map(genre => (
+                                        <button
+                                            key={genre}
+                                            type="button"
+                                            onClick={() => handleGenreSelect(genre)}
+                                            className="group flex items-center gap-2 bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 px-3 py-1.5 rounded-full text-xs font-bold hover:bg-[var(--accent)]/20 transition-all"
+                                        >
+                                            {genre}
+                                            <X size={12} className="text-[var(--accent)]/50 group-hover:text-[var(--accent)]" />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
 
-                        {/* Socials */}
-                        <div>
-                            <h3 className="text-sm font-bold text-white/70 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <Globe size={14} /> Social Links
+                        {/* Location */}
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-bold text-white uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                <span className="w-6 h-px bg-[var(--accent)]" /> 3. Origin
+                            </h3>
+                            <div className="grid md:grid-cols-2 gap-6">
+                                <SearchableSelect
+                                    label="Country"
+                                    options={COUNTRIES}
+                                    value={formData.location_country}
+                                    onChange={(val) => setFormData({ ...formData, location_country: val, location_city: '' })}
+                                    placeholder="Select Country"
+                                />
+                                <SearchableSelect
+                                    label="City"
+                                    options={availableCities}
+                                    value={formData.location_city}
+                                    onChange={(val) => setFormData({ ...formData, location_city: val })}
+                                    placeholder="Select City"
+                                    disabled={!formData.location_country}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Social Links */}
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-bold text-white uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                <span className="w-6 h-px bg-[var(--accent)]" /> 4. Connect
                             </h3>
                             <div className="grid md:grid-cols-2 gap-4">
-                                <div className="relative">
-                                    <Instagram className="absolute top-1/2 -translate-y-1/2 left-3 text-pink-500" size={18} />
+                                <div className="relative group">
+                                    <Instagram size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[var(--accent)] transition-colors" />
                                     <input
                                         type="text"
                                         name="social_instagram"
                                         value={formData.social_instagram}
                                         onChange={handleChange}
-                                        placeholder="Instagram Username"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-white/20 focus:outline-none focus:border-pink-500 transition-colors"
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm text-white focus:outline-none focus:border-[var(--accent)] transition-all"
+                                        placeholder="Instagram username"
                                     />
                                 </div>
-                                <div className="relative">
-                                    <Music2 className="absolute top-1/2 -translate-y-1/2 left-3 text-green-500" size={18} />
+                                <div className="relative group">
+                                    <Music size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[var(--accent)] transition-colors" />
                                     <input
                                         type="text"
                                         name="social_spotify"
                                         value={formData.social_spotify}
                                         onChange={handleChange}
-                                        placeholder="Spotify Artist ID"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-white/20 focus:outline-none focus:border-green-500 transition-colors"
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm text-white focus:outline-none focus:border-[var(--accent)] transition-all"
+                                        placeholder="Spotify Artist URL"
                                     />
                                 </div>
-                                <div className="relative">
-                                    < Globe className="absolute top-1/2 -translate-y-1/2 left-3 text-red-500" size={18} />
+                                <div className="relative group">
+                                    <Youtube size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[var(--accent)] transition-colors" />
                                     <input
                                         type="text"
                                         name="social_youtube"
                                         value={formData.social_youtube}
                                         onChange={handleChange}
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm text-white focus:outline-none focus:border-[var(--accent)] transition-all"
                                         placeholder="YouTube Channel URL"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-white/20 focus:outline-none focus:border-red-500 transition-colors"
                                     />
                                 </div>
-                                <div className="relative">
-                                    <Music className="absolute top-1/2 -translate-y-1/2 left-3 text-orange-500" size={18} />
+                                <div className="relative group">
+                                    <Music2 size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-[var(--accent)] transition-colors" />
                                     <input
                                         type="text"
                                         name="social_soundcloud"
                                         value={formData.social_soundcloud}
                                         onChange={handleChange}
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm text-white focus:outline-none focus:border-[var(--accent)] transition-all"
                                         placeholder="SoundCloud URL"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-white/20 focus:outline-none focus:border-orange-500 transition-colors"
                                     />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex justify-end pt-4">
+                        <div className="flex justify-end pt-8 border-t border-white/5">
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="px-8 py-4 bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-white font-bold rounded-2xl shadow-lg shadow-red-900/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 min-w-[200px]"
+                                className="px-10 py-4 bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-white font-black rounded-2xl shadow-xl shadow-red-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3 min-w-[240px]"
                             >
-                                {loading ? 'Saving...' : <><Save size={20} /> Save Changes</>}
+                                {loading ? (
+                                    <>Saving Your Profile...</>
+                                ) : (
+                                    <>
+                                        <Save size={20} strokeWidth={3} />
+                                        COMPLETE SETUP
+                                    </>
+                                )}
                             </button>
                         </div>
                     </form>

@@ -67,7 +67,7 @@ class TrackSeeder extends Seeder
                 [
                     'user_id' => $user->id,
                     'status' => 'published',
-                    'file_path' => null, // Will depend on YouTube
+                    'file_path' => null, 
                     'is_public' => true,
                 ]
             );

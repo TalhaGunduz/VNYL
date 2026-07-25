@@ -1,154 +1,61 @@
 import React, { useMemo, useRef, useState, MouseEvent, useEffect } from 'react';
-import { motion, useMotionValue, useSpring, useTransform, MotionValue } from 'framer-motion';
-import { Twitter, Github, Dribbble, ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Twitter, Github, Dribbble, ChevronLeft, ChevronRight, Play, Compass, Heart, ListMusic, User, Share2 } from 'lucide-react';
 import Swal from 'sweetalert2';
+import TrackCard from '../components/TrackCard';
+import { usePlayer } from '../context/PlayerContext';
+import { useNavigate } from 'react-router-dom';
+import AddToPlaylistModal from '../components/AddToPlaylistModal';
+import { apiFetch } from '../utils/api';
 
-const tracks = [
-  { id: 1, title: 'Neon Dreams', artist: 'Luna Waves', gradient: 'from-[#1f1f1f] via-[#2b2b2b] to-[#3a3a3a]' },
-  { id: 2, title: 'Midnight Echoes', artist: 'Caspian Vale', gradient: 'from-[#2a1f14] via-[#3b2a1f] to-[#4b372a]' },
-  { id: 3, title: 'Quiet Streets', artist: 'Vesper', gradient: 'from-[#1a202c] via-[#222b3a] to-[#2d3a4a]' },
-  { id: 4, title: 'Static Sun', artist: 'Amberline', gradient: 'from-[#241a1a] via-[#2f2222] to-[#3a2b2b]' },
-  { id: 5, title: 'Glass Birds', artist: 'Mira', gradient: 'from-[#1a1f24] via-[#222a30] to-[#2a3540]' },
-  { id: 6, title: 'Signal Fire', artist: 'Kite Club', gradient: 'from-[#1b1b1b] via-[#282828] to-[#353535]' },
-  { id: 7, title: 'Soft Bloom', artist: 'Juniper', gradient: 'from-[#1e1a24] via-[#2a2230] to-[#352a3d]' },
-  { id: 8, title: 'Over Water', artist: 'Kepler', gradient: 'from-[#1a2420] via-[#223028] to-[#2a3d34]' },
-];
-
-function Waveform({ bars = 28, color = '#FF6B00', isPlaying }: { bars?: number; color?: string; isPlaying: boolean }) {
-  const heights = React.useMemo(
-    () => Array.from({ length: bars }, (_, i) => 30 + Math.round(40 * Math.abs(Math.sin(i * 0.55)))),
-    [bars]
-  );
-
-  return (
-    <div className="flex items-end gap-[3px] h-20 w-full overflow-hidden">
-      {heights.map((h, i) => (
-        <motion.span
-          key={i}
-          className="w-[3px] rounded-sm"
-          style={{ backgroundColor: color }}
-          initial={{ height: Math.max(8, h * 0.5), opacity: 0.6 }}
-          animate={isPlaying ? { height: h, opacity: [0.6, 0.85, 0.6] } : { height: 10, opacity: 0.4 }}
-          transition={isPlaying ? {
-            duration: 1.8,
-            repeat: Infinity,
-            repeatType: 'mirror',
-            delay: i * 0.03,
-            ease: 'easeInOut',
-          } : { duration: 0.4, ease: 'easeOut' }}
-        />
-      ))}
+// Shared logic from Hub (simplified)
+const SectionHeader = ({ title, subtitle, onScrollLeft, onScrollRight }: any) => (
+  <div className="flex items-end justify-between mb-6 md:mb-8">
+    <div className="flex items-center gap-4">
+      <div className="h-8 w-1 bg-[var(--accent)] rounded-full" />
+      <div>
+        <h2 className="text-xl md:text-2xl font-bold">{title}</h2>
+        <p className="text-white/30 text-xs font-medium tracking-wider uppercase mt-1">{subtitle}</p>
+      </div>
     </div>
-  );
-}
-
-const TrackCard = ({ track, idx }: { track: typeof tracks[0], idx: number }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  const springConfig = { damping: 25, stiffness: 200, mass: 0.6 };
-  const smoothMouseX = useSpring(mouseX, springConfig);
-  const smoothMouseY = useSpring(mouseY, springConfig);
-
-  const spotlightOpacity = useTransform(
-    [smoothMouseX, smoothMouseY] as MotionValue<number>[],
-    ([x, y]: [number, number]) => {
-      if (!cardRef.current) return 0;
-      const rect = cardRef.current.getBoundingClientRect();
-      const isInside = x > rect.left && x < rect.right && y > rect.top && y < rect.bottom;
-      return isInside ? 1 : 0;
-    }
-  );
-
-  useEffect(() => {
-    const handleMouseMove = (e: globalThis.MouseEvent) => {
-      mouseX.set(e.clientX);
-      mouseY.set(e.clientY);
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [mouseX, mouseY]);
-
-  return (
-    <motion.article
-      ref={cardRef}
-      key={track.id}
-      className={`snap-start shrink-0 w-[78vw] sm:w-[420px] md:w-[520px] rounded-2xl bg-gradient-to-br border border-white/5 p-5 md:p-6 shadow-soft relative overflow-hidden ${track.gradient}`}
-      whileHover={{ y: -6, transition: { type: 'spring', stiffness: 250, damping: 20, mass: 0.6 } }}
-      initial={{ opacity: 0, x: 12 }}
-      whileInView={{ opacity: 1, x: 0 }}
-      viewport={{ once: true, amount: 0.3 }}
-    >
-      <motion.div
-        className="pointer-events-none absolute -inset-px rounded-2xl"
-        style={{
-          background: useTransform(
-            [smoothMouseX, smoothMouseY] as MotionValue<number>[],
-            ([x, y]: [number, number]) => {
-              if (!cardRef.current) return 'radial-gradient(400px at 0px 0px, rgba(255, 107, 0, 0.15), transparent 80%)';
-              const rect = cardRef.current.getBoundingClientRect();
-              return `radial-gradient(400px at ${x - rect.left}px ${y - rect.top}px, rgba(255, 107, 0, 0.15), transparent 80%)`;
-            }
-          ),
-          opacity: spotlightOpacity,
-        }}
-      />
-      <div className="flex items-center gap-4">
-        <div className={`h-20 w-20 md:h-24 md:w-24 rounded-xl bg-gradient-to-br ${track.gradient} relative overflow-hidden border border-white/10`}>
-          <div
-            className="absolute inset-0 opacity-20 mix-blend-overlay"
-            style={{ background: `radial-gradient(120% 120% at 20% 10%, #FF6B0030 0%, transparent 60%)` }}
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0)_40%,rgba(255,255,255,0.04)_100%)]" />
-        </div>
-
-        <div className="min-w-0">
-          <h3 className="text-base md:text-lg font-semibold truncate">{track.title}</h3>
-          <p className="text-sm md:text-base text-white/60 truncate">{track.artist}</p>
-          <div className="mt-2 flex items-center gap-2 text-xs text-white/50">
-            <span>Indie</span>
-            <span className="text-white/20">•</span>
-            <span>
-              {3 + (idx % 3)}:{(idx * 23) % 60 < 10 ? '0' : ''}
-              {(idx * 23) % 60}
-            </span>
-          </div>
-        </div>
-
-        <motion.button
-          aria-label={`Play ${track.title} by ${track.artist}`}
-          className="ml-auto h-12 w-12 rounded-full flex items-center justify-center shadow-inner bg-accent"
-          onClick={() => setIsPlaying(!isPlaying)}
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.96 }}
-        >
-          {isPlaying ? <Pause size={20} className="text-bg" /> : <Play size={20} className="text-bg translate-x-[1px]" />}
-        </motion.button>
-      </div>
-
-      <div className="mt-5 md:mt-6">
-        <Waveform color="#FF6B00" isPlaying={isPlaying} />
-      </div>
-
-      <div
-        className="pointer-events-none absolute -inset-[1px] rounded-2xl"
-        style={{
-          boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.06), 0 30px 60px -40px #FF6B0020`,
-        }}
-      />
-    </motion.article>
-  );
-};
+    <div className="flex gap-2">
+      <button
+        onClick={onScrollLeft}
+        className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/5 border border-white/5 flex items-center justify-center hover:bg-white/10 hover:border-white/20 transition-all"
+      >
+        <ChevronLeft size={18} />
+      </button>
+      <button
+        onClick={onScrollRight}
+        className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/5 border border-white/5 flex items-center justify-center hover:bg-white/10 hover:border-white/20 transition-all"
+      >
+        <ChevronRight size={18} />
+      </button>
+    </div>
+  </div>
+);
 
 export default function Home() {
   const accent = '#FF6B00';
-  const bg = '#0e0e0e';
-  const fg = '#f5f5f5';
-
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { playTrack } = usePlayer();
+  const navigate = useNavigate();
+
+  const [tracks, setTracks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [addToPlaylistTrackId, setAddToPlaylistTrackId] = useState<number | null>(null);
+  const [activeMenu, setActiveMenu] = useState<{ id: number, x: number, y: number, opensUp: boolean, opensLeft: boolean } | null>(null);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (target.closest('[data-menu-trigger]') || target.closest('[data-context-menu]')) return;
+      setActiveMenu(null);
+    };
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const videoList = useMemo(() => ['/assets/1.mp4', '/assets/2.mp4', '/assets/3.mp4', '/assets/4.mp4', '/assets/5.mp4', '/assets/6.mp4'], []);
   const randomVideo = useMemo(() => {
@@ -158,123 +65,173 @@ export default function Home() {
 
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
+  useEffect(() => {
+    apiFetch('/api/public-tracks')
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          setTracks(data.tracks.sort(() => 0.5 - Math.random()).slice(0, 10));
+        }
+      })
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
+
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
   };
 
+  // Scroll Handler
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = direction === 'left' ? -300 : 300;
+      scrollContainerRef.current.scrollBy({
+        left: scrollAmount,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  // Track Actions
+  const handleToggleLike = async (trackId: number) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      Swal.fire({
+        title: 'Giriş Gerekli',
+        text: 'Şarkıları beğenmek için giriş yapmalısınız.',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'Giriş Yap',
+        cancelButtonText: 'İptal',
+        background: '#161616',
+        color: '#fff',
+        confirmButtonColor: '#FF6B00',
+        cancelButtonColor: '#333',
+        customClass: {
+          popup: 'rounded-[24px]',
+          confirmButton: 'rounded-full px-6 py-2',
+          cancelButton: 'rounded-full px-6 py-2'
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          navigate('/login');
+        }
+      });
+      return;
+    }
+    try {
+      const response = await apiFetch(`/api/tracks/${trackId}/like`, { method: 'POST' });
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.dispatchEvent(new Event('storage'));
+        Swal.fire({
+          title: 'Giriş Gerekli',
+          text: 'Şarkıları beğenmek için giriş yapmalısınız.',
+          icon: 'info',
+          showCancelButton: true,
+          confirmButtonText: 'Giriş Yap',
+          cancelButtonText: 'İptal',
+          background: '#161616',
+          color: '#fff',
+          confirmButtonColor: '#FF6B00',
+          cancelButtonColor: '#333',
+          customClass: {
+            popup: 'rounded-[24px]',
+            confirmButton: 'rounded-full px-6 py-2',
+            cancelButton: 'rounded-full px-6 py-2'
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            navigate('/login');
+          }
+        });
+        return;
+      }
+
+      const data = await response.json();
+      if (data.status === 'success') {
+        setTracks(prev => prev.map(t =>
+          t.id === trackId ? { ...t, is_liked: data.liked } : t
+        ));
+      }
+    } catch (error) {
+      console.error("Error toggling like", error);
+    }
+  };
+
+  const handleAddToPlaylist = (trackId: number) => {
+    if (!localStorage.getItem('token')) {
+      Swal.fire('Login Required', 'You need to login to add to playlists.', 'info');
+      return;
+    }
+    setAddToPlaylistTrackId(trackId);
+  };
+
+  const handleMenuClick = (e: React.MouseEvent, track: any) => {
+    e.stopPropagation();
+    // Use closest('[data-menu-trigger]') for reliable positioning through prop chains
+    const btn = (e.target as Element).closest('[data-menu-trigger]') as HTMLElement
+      ?? (e.currentTarget as HTMLElement);
+    const rect = btn.getBoundingClientRect();
+    const menuWidth = 224;
+    const menuHeight = 190;
+    const isOnRightHalf = rect.left > window.innerWidth / 2;
+    const isOnBottomHalf = rect.top > window.innerHeight * 0.6;
+    setActiveMenu(prev => prev?.id === track.id ? null : {
+      id: track.id,
+      x: isOnRightHalf ? (rect.right - menuWidth) : rect.left,
+      y: isOnBottomHalf ? (rect.top - menuHeight - 8) : (rect.bottom + 8),
+      opensUp: isOnBottomHalf,
+      opensLeft: isOnRightHalf
+    });
+  };
+
+  // Auth Logic (Keep existing)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const loginSuccess = params.get('login_success');
     const token = params.get('token');
     const error = params.get('error');
 
-    // Debug: Log complete return URL
-    if (loginSuccess || error) {
-      console.log('Google Auth Return:', {
-        loginSuccess,
-        token: token ? 'Present' : 'Missing',
-        error,
-        allParams: Object.fromEntries(params.entries())
-      });
-    }
-
     if (loginSuccess === 'true') {
-      // 1. Try to use Token + API (Best for nested data)
       if (token) {
         localStorage.setItem('token', token);
-
         fetch('http://127.0.0.1:8000/api/user', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-          }
+          headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
         })
-          .then(res => {
-            if (!res.ok) throw new Error('Failed to fetch user data');
-            return res.json();
-          })
+          .then(res => res.json())
           .then(userData => {
-            console.log('Fetched User Data via API:', userData);
-            finalizeLogin(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
+            window.dispatchEvent(new Event('storage'));
+            Swal.fire({ title: 'Welcome!', icon: 'success', timer: 2000, showConfirmButton: false });
+            window.history.replaceState({}, document.title, window.location.pathname);
           })
-          .catch(err => {
-            console.error('API Fetch failed, falling back to URL params:', err);
-            fallbackToUrlParams(params);
-          });
-      } else {
-        // 2. Fallback to URL Params (If no token provided)
-        console.warn('No token found, using URL parameters.');
-        fallbackToUrlParams(params);
+          .catch(err => console.error(err));
       }
     } else if (error) {
-      Swal.fire({
-        title: 'Hata!',
-        text: 'Google girişi başarısız oldu.',
-        icon: 'error',
-        confirmButtonText: 'Tamam'
-      });
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    function fallbackToUrlParams(params: URLSearchParams) {
-      const userData = {
-        name: params.get('name') || params.get('username') || 'User',
-        username: params.get('username'),
-        avatar: params.get('avatar'),
-        email: params.get('email'),
-        joinedAt: params.get('joined_at'),
-        dob: params.get('dob'),
-        location: params.get('location'),
-        // Try to parse basic artist info if flattened in URL
-        artist: params.get('artist_stage_name') ? {
-          stage_name: params.get('artist_stage_name'),
-          bio: params.get('artist_bio')
-        } : undefined
-      };
-      console.log('Constructed User Data from URL:', userData);
-      finalizeLogin(userData);
-    }
-
-    function finalizeLogin(userData: any) {
-      localStorage.setItem('user', JSON.stringify(userData));
-      window.dispatchEvent(new Event('storage'));
-
-      Swal.fire({
-        title: 'Google ile giriş başarılı!',
-        icon: 'success',
-        timer: 2000,
-        showConfirmButton: false
-      });
-
-      window.history.replaceState({}, document.title, window.location.pathname);
+      Swal.fire('Error', 'Login failed.', 'error');
     }
   }, []);
 
-  const handleScroll = (direction: 'left' | 'right') => {
-    if (scrollContainerRef.current) {
-      const scrollAmount = scrollContainerRef.current.offsetWidth * 0.8;
-      scrollContainerRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth',
-      });
-    }
-  };
-
   return (
     <div
-      className="min-h-screen bg-bg text-fg font-sans relative overflow-x-hidden"
+      className="min-h-screen bg-[#0a0a0a] text-[#f5f5f5] font-sans relative overflow-x-hidden selection:bg-[var(--accent)] selection:text-black"
       onMouseMove={handleMouseMove}
     >
+      {/* Background Effects */}
       <div
         className="pointer-events-none absolute inset-0 z-0"
         style={{
-          background: `radial-gradient(800px circle at ${mousePosition.x}px ${mousePosition.y}px, ${accent}10, transparent 40%)`,
+          background: `radial-gradient(800px circle at ${mousePosition.x}px ${mousePosition.y}px, ${accent}08, transparent 40%)`,
         }}
       />
-      <div className="pointer-events-none absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.02%22%20fill-rule%3D%22evenodd%22%3E%3Cpath%20d%3D%22M0%2040L40%200H20L0%2020M40%2040V20L20%2040%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-50" />
+      <div className="pointer-events-none absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2240%22%20height%3D%2240%22%20viewBox%3D%220%200%2040%2040%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.02%22%20fill-rule%3D%22evenodd%22%3E%3Cpath%20d%3D%22M0%2040L40%200H20L0%2020M40%2040V20L20%2040%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-30" />
+
 
       {/* Hero */}
-      <section className="relative h-[50vh] md:h-[60vh] flex items-center justify-center overflow-hidden">
+      <section className="relative h-[55vh] md:h-[65vh] flex items-center justify-center overflow-hidden border-b border-white/5">
         <div className="absolute inset-0 z-0">
           <video
             key={randomVideo}
@@ -285,114 +242,168 @@ export default function Home() {
             playsInline
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-black/60" />
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent" />
         </div>
 
         <div className="relative z-10 mx-auto max-w-7xl px-6 md:px-8 text-center">
-          <motion.img
-            src="/assets/vnyl_logo.png"
-            alt="vnyl logo"
-            className="mx-auto w-[200px] md:w-[320px] select-none"
-            style={{ filter: `drop-shadow(0 0 24px ${accent}20)` }}
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: [1, 1.04, 1] }}
-            transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 1.3, ease: 'easeInOut' }}
-          />
-          <motion.p
-            className="mt-6 text-center text-white/70 max-w-2xl mx-auto"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
           >
-            Stream indie. Share ideas. Ride the waveform.
+            <img
+              src="/assets/vnyl_logo.png"
+              alt="vnyl logo"
+              className="mx-auto w-[220px] md:w-[340px] select-none drop-shadow-2xl"
+            />
+          </motion.div>
+
+          <motion.p
+            className="mt-6 text-center text-white/80 max-w-2xl mx-auto text-lg md:text-xl font-light tracking-wide"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+          >
+            Stream music. Share ideas. Ride the waveform.
           </motion.p>
+
+          <motion.div
+            className="mt-10"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <button
+              onClick={() => {
+                const hubSection = document.getElementById('featured');
+                hubSection?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-8 py-3 rounded-full bg-white text-black font-bold tracking-wide hover:scale-105 transition-transform flex items-center gap-2 mx-auto"
+            >
+              <Play size={18} fill="black" /> START LISTENING
+            </button>
+          </motion.div>
         </div>
       </section>
 
       {/* Featured Tracks */}
-      <section className="mx-auto max-w-7xl w-full px-6 md:px-8 py-10 md:py-16">
-        <motion.div
-          className="flex items-center justify-between mb-4 md:mb-6"
-          initial={{ opacity: 0, y: 8 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.5 }}
-        >
-          <h2 className="text-lg md:text-xl font-semibold">Featured tracks</h2>
-          <div className="flex items-center gap-2">
-            <motion.button
-              onClick={() => handleScroll('left')}
-              className="h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
-              whileTap={{ scale: 0.9 }}
-            >
-              <ChevronLeft size={18} />
-            </motion.button>
-            <motion.button
-              onClick={() => handleScroll('right')}
-              className="h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
-              whileTap={{ scale: 0.9 }}
-            >
-              <ChevronRight size={18} />
-            </motion.button>
-          </div>
-        </motion.div>
+      <section id="featured" className="mx-auto max-w-7xl w-full px-6 md:px-8 py-16">
+        <SectionHeader
+          title="Featured Tracks"
+          subtitle="DISCOVER NEW SOUNDS"
+          onScrollLeft={() => handleScroll('left')}
+          onScrollRight={() => handleScroll('right')}
+        />
 
-        <div role="region" aria-label="Featured tracks" className="relative">
-          <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-bg to-transparent pointer-events-none z-10" />
-          <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg to-transparent pointer-events-none z-10" />
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#0a0a0a] to-transparent pointer-events-none z-10" />
+          <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#0a0a0a] to-transparent pointer-events-none z-10" />
 
-          <div ref={scrollContainerRef} className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-4 scrollbar-hide" tabIndex={0}>
-            {tracks.map((t, idx) => (
-              <TrackCard track={t} idx={idx} key={t.id} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex gap-6 overflow-hidden">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="w-[220px] h-[300px] bg-white/5 rounded-3xl animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div ref={scrollContainerRef} className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide snap-x">
+              {tracks.map((t) => (
+                <div key={t.id} className="snap-start shrink-0">
+                  <TrackCard
+                    track={t}
+                    onClick={() => playTrack(t)}
+                    onLike={() => handleToggleLike(t.id)}
+                    onAddToPlaylist={() => handleAddToPlaylist(t.id)}
+                    onMenuClick={(e) => handleMenuClick(e, t)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </section>
-
-      {/* Feed preview */}
-      <section className="mx-auto max-w-7xl w-full px-6 md:px-8 pb-16 md:pb-24">
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: 0.5 }}
-          className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 md:p-6"
-        >
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Your feed</h3>
-            <a className="text-sm text-white/60 hover:text-white transition-colors" href="#refresh">Refresh</a>
-          </div>
-          <div className="mt-4 space-y-4">
-            <div className="flex items-center gap-3">
-              <img src="https://i.pravatar.cc/40?u=a" alt="User avatar" className="h-10 w-10 rounded-full" />
-              <p className="text-sm text-white/80">
-                <span className="font-semibold text-white">Caspian Vale</span> uploaded a new track: <span className="text-accent">"Midnight Echoes"</span>
-
-              </p>
-              <span className="ml-auto text-xs text-white/40">2h ago</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <img src="https://i.pravatar.cc/40?u=b" alt="User avatar" className="h-10 w-10 rounded-full" />
-              <p className="text-sm text-white/80">
-                <span className="font-semibold text-white">Luna Waves</span> liked <span className="text-accent">"Static Sun"</span> by Amberline
-              </p>
-              <span className="ml-auto text-xs text-white/40">5h ago</span>
-            </div>
-          </div>
-        </motion.div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/5">
-        <div className="mx-auto max-w-7xl px-6 md:px-8 py-8 flex justify-between items-center">
-          <p className="text-xs text-white/50">© 2025 vnyl. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <a href="#" className="text-white/50 hover:text-accent transition-colors"><Twitter size={16} /></a>
-            <a href="#" className="text-white/50 hover:text-accent transition-colors"><Github size={16} /></a>
-            <a href="#" className="text-white/50 hover:text-accent transition-colors"><Dribbble size={16} /></a>
+      <footer className="border-t border-white/5 bg-[#121212]">
+        <div className="mx-auto max-w-7xl px-6 md:px-8 py-12 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-3 opacity-50">
+            <Compass size={24} />
+            <span className="font-bold tracking-widest">VNYL</span>
+          </div>
+          <p className="text-sm text-white/30">© 2025 vnyl. All rights reserved.</p>
+          <div className="flex items-center gap-6">
+            <a href="#" className="text-white/30 hover:text-white transition-colors"><Twitter size={20} /></a>
+            <a href="#" className="text-white/30 hover:text-white transition-colors"><Github size={20} /></a>
+            <a href="#" className="text-white/30 hover:text-white transition-colors"><Dribbble size={20} /></a>
           </div>
         </div>
       </footer>
+
+      <AddToPlaylistModal
+        trackId={addToPlaylistTrackId}
+        onClose={() => setAddToPlaylistTrackId(null)}
+      />
+
+      {/* Global Context Menu */}
+      {activeMenu && (() => {
+        const track = tracks.find(t => t.id === activeMenu.id);
+        if (!track) return null;
+        return (
+          <div
+            data-context-menu="true"
+            className="fixed z-[9999] w-56 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+            style={{
+              top: activeMenu.y,
+              left: activeMenu.x,
+              transformOrigin: `${activeMenu.opensLeft ? 'right' : 'left'} ${activeMenu.opensUp ? 'bottom' : 'top'}`
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-3 transition-colors border-b border-white/5"
+              onClick={() => { handleToggleLike(track.id); setActiveMenu(null); }}
+            >
+              <Heart size={16} className={track.is_liked ? 'text-red-500 fill-current' : ''} />
+              {track.is_liked ? 'Liked' : 'Like Song'}
+            </button>
+            <button
+              className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-3 transition-colors"
+              onClick={() => { handleAddToPlaylist(track.id); setActiveMenu(null); }}
+            >
+              <ListMusic size={16} />
+              Add to Playlist
+            </button>
+            <button
+              className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-3 transition-colors"
+              onClick={() => {
+                if (track.artist?.slug || track.artist?.id) {
+                  navigate(`/artist/${track.artist.slug || track.artist.id}`);
+                } else if (track.featured_artist) {
+                  navigate(`/search?q=${encodeURIComponent(track.featured_artist)}`);
+                }
+                setActiveMenu(null);
+              }}
+            >
+              <User size={16} />
+              Go to Artist
+            </button>
+            <button
+              className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-3 transition-colors border-t border-white/5"
+              onClick={() => {
+                const shareUrl = `${window.location.origin}/track/${track.id}`;
+                navigator.clipboard.writeText(shareUrl);
+                const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, background: '#1a1a1a', color: '#fff' });
+                Toast.fire({ icon: 'success', title: 'Link copied to clipboard' });
+                setActiveMenu(null);
+              }}
+            >
+              <Share2 size={16} />
+              Share
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }

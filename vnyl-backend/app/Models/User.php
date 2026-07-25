@@ -84,7 +84,7 @@ class User extends Authenticatable
      *
      * @var array
      */
-    protected $appends = ['joined_at', 'is_artist', 'is_verified'];
+    protected $appends = ['joined_at', 'is_artist', 'is_verified', 'tracks_count', 'likes_count', 'followers_count', 'following_count'];
 
     /**
      * Get the user's joined date in a human readable format.
@@ -111,6 +111,14 @@ class User extends Authenticatable
     }
 
     /**
+     * The tracks uploaded by the user.
+     */
+    public function tracks()
+    {
+        return $this->hasMany(Track::class);
+    }
+
+    /**
      * The tracks that the user has liked.
      */
     public function likes()
@@ -118,8 +126,50 @@ class User extends Authenticatable
         return $this->belongsToMany(Track::class, 'track_likes', 'user_id', 'track_id')->withTimestamps();
     }
 
+    /**
+     * Get the number of tracks uploaded by the user.
+     */
+    public function getTracksCountAttribute(): int
+    {
+        return $this->tracks()->count();
+    }
+
+    /**
+     * Get the number of tracks liked by the user.
+     */
+    public function getLikesCountAttribute(): int
+    {
+        return $this->likes()->count();
+    }
+
     public function playlists()
     {
         return $this->hasMany(Playlist::class);
+    }
+
+    /**
+     * The users that follow this user.
+     */
+    public function followers()
+    {
+        return $this->belongsToMany(User::class, 'followers', 'following_id', 'follower_id')->withTimestamps();
+    }
+
+    /**
+     * The users that this user follows.
+     */
+    public function following()
+    {
+        return $this->belongsToMany(User::class, 'followers', 'follower_id', 'following_id')->withTimestamps();
+    }
+
+    public function getFollowersCountAttribute(): int
+    {
+        return $this->followers()->count();
+    }
+
+    public function getFollowingCountAttribute(): int
+    {
+        return $this->following()->count();
     }
 }

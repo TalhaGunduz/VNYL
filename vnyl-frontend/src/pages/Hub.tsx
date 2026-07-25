@@ -4,98 +4,10 @@ import { Play, Heart, MoreVertical, Compass, Music, ListPlus, ListMusic, User, S
 import { usePlayer } from '../context/PlayerContext';
 import { useNavigate } from 'react-router-dom';
 import AddToPlaylistModal from '../components/AddToPlaylistModal';
+import TrackCard from '../components/TrackCard';
+import Swal from 'sweetalert2';
+import { apiFetch } from '../utils/api';
 
-const TrackCard = ({ track, onClick, onLike, onAddToPlaylist, onMenuClick }: { track: any, onClick: () => void, onLike: () => void, onAddToPlaylist: () => void, onMenuClick: (e: React.MouseEvent) => void }) => {
-    const [imgError, setImgError] = useState(false);
-    const navigate = useNavigate();
-
-    // Resolve Image URL
-    const getImageUrl = () => {
-        if (track.cover_image) return track.cover_image; // YouTube URL
-        if (track.cover_path) return `http://127.0.0.1:8000/storage/${track.cover_path}`; // Local Storage URL
-        return null;
-    };
-
-    const imageUrl = getImageUrl();
-    // Fallback text avatar if no image
-    const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(track.title)}&background=random&color=fff&size=512`;
-
-    const handleArtistClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (track.artist?.slug) {
-            navigate(`/artist/${track.artist.slug}`);
-        } else {
-            console.warn("No artist linked for this track");
-        }
-    };
-
-    return (
-        <div
-            className="group relative w-[220px] bg-[#161616] hover:bg-[#1f1f1f] p-3 rounded-[24px] transition-all duration-300 cursor-pointer border border-white/5 hover:border-white/10 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50"
-            onClick={onClick}
-        >
-            {/* Uniquely Styled Image Container */}
-            <div className="relative aspect-square w-full rounded-[16px] overflow-hidden bg-[#000] shadow-inner mb-4 flex items-center justify-center">
-                {!imgError ? (
-                    <img
-                        src={imageUrl || fallbackUrl}
-                        alt={track.title}
-                        referrerPolicy="no-referrer"
-                        onError={() => setImgError(true)}
-                        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                    />
-                ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-gray-800 to-black flex items-center justify-center text-white/20 group-hover:text-[var(--accent)] transition-colors">
-                        <Music size={40} />
-                    </div>
-                )}
-
-                {/* Play Button - Lower z-index than actions */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 pointer-events-none">
-                    <div className="w-12 h-12 bg-[var(--accent)] text-black rounded-full flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 pointer-events-auto">
-                        <Play fill="currentColor" size={20} className="ml-0.5" />
-                    </div>
-                </div>
-
-                {/* Heart Icon Overlay - Higher z-index to be clickable */}
-                <button
-                    className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all z-20 ${track.is_liked ? 'bg-red-500/20 text-red-500 backdrop-blur-md' : 'bg-black/30 text-white/50 hover:text-white backdrop-blur-md hover:bg-black/50'}`}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onLike();
-                    }}
-                >
-                    <Heart size={14} fill={track.is_liked ? "currentColor" : "none"} />
-                </button>
-            </div>
-
-            {/* Card Metadata */}
-            <div className="px-1 pb-2 relative">
-                <div className="flex justify-between items-start gap-2">
-                    <h3 className="font-bold text-white text-[15px] leading-tight line-clamp-1" title={track.title}>
-                        {track.title}
-                    </h3>
-
-                    {/* Context Menu Trigger - Now externally controlled */}
-                    <button
-                        className="text-white/30 hover:text-white transition-colors p-1"
-                        onClick={onMenuClick}
-                    >
-                        <MoreVertical size={18} />
-                    </button>
-                </div>
-
-                {/* Clickable Artist Name */}
-                <p
-                    className="text-white/40 text-[13px] font-medium mt-1 truncate hover:text-[var(--accent)] hover:underline transition-colors w-fit"
-                    onClick={handleArtistClick}
-                >
-                    {track.featured_artist}
-                </p>
-            </div>
-        </div>
-    );
-};
 
 const SectionCarousel = ({ title, subtitle, tracks, onPlay, onLike, onAddToPlaylist, onMenuClick }: any) => {
     const scrollContainer = useRef<HTMLDivElement>(null);
@@ -166,8 +78,17 @@ const Hub = () => {
     const [tracks, setTracks] = useState<any[]>([]);
     const [artists, setArtists] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const { playTrack } = usePlayer();
+    const { playTrack, currentTrack } = usePlayer();
     const navigate = useNavigate();
+
+    // Sync local tracks state when currentTrack (and its like status) changes in player context
+    useEffect(() => {
+        if (currentTrack) {
+            setTracks(prev => prev.map(t =>
+                t.id === currentTrack.id ? { ...t, is_liked: currentTrack.is_liked, likes_count: currentTrack.likes_count } : t
+            ));
+        }
+    }, [currentTrack]);
 
     // Add to Playlist Modal State
     const [addToPlaylistTrackId, setAddToPlaylistTrackId] = useState<number | null>(null);
@@ -182,9 +103,32 @@ const Hub = () => {
     // Global Context Menu State
     const [activeMenu, setActiveMenu] = useState<{ id: number, x: number, y: number, opensUp: boolean, opensLeft: boolean } | null>(null);
 
+    const handleMenuClick = (e: React.MouseEvent, track: any) => {
+        e.stopPropagation();
+        // Use closest('[data-menu-trigger]') for reliable positioning through prop chains
+        const btn = (e.target as Element).closest('[data-menu-trigger]') as HTMLElement
+            ?? (e.currentTarget as HTMLElement);
+        const rect = btn.getBoundingClientRect();
+        const menuWidth = 224;
+        const menuHeight = 190;
+        const isOnRightHalf = rect.left > window.innerWidth / 2;
+        const isOnBottomHalf = rect.top > window.innerHeight * 0.6;
+        setActiveMenu(prev => prev?.id === track.id ? null : {
+            id: track.id,
+            x: isOnRightHalf ? (rect.right - menuWidth) : rect.left,
+            y: isOnBottomHalf ? (rect.top - menuHeight - 8) : (rect.bottom + 8),
+            opensUp: isOnBottomHalf,
+            opensLeft: isOnRightHalf
+        });
+    };
+
     // Close menu when clicking outside
     useEffect(() => {
-        const handleClickOutside = () => setActiveMenu(null);
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as Element;
+            if (target.closest('[data-menu-trigger]') || target.closest('[data-context-menu]')) return;
+            setActiveMenu(null);
+        };
         window.addEventListener('click', handleClickOutside);
         return () => window.removeEventListener('click', handleClickOutside);
     }, []);
@@ -194,19 +138,14 @@ const Hub = () => {
             setLoading(true);
             try {
                 // Fetch Tracks
-                const res = await fetch('http://127.0.0.1:8000/api/hub', {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}` // Ensure auth for like status
-                    }
-                });
+                const res = await apiFetch('/api/hub');
                 const data = await res.json();
                 if (data.status === 'success') {
-                    // Shuffle tracks once on load
                     setTracks(data.tracks.sort(() => 0.5 - Math.random()));
                 }
 
                 // Fetch Artists
-                const resArtists = await fetch('http://127.0.0.1:8000/api/artists');
+                const resArtists = await apiFetch('/api/artists');
                 const dataArtists = await resArtists.json();
                 if (dataArtists.status === 'success') {
                     setArtists(dataArtists.artists);
@@ -222,18 +161,58 @@ const Hub = () => {
     }, []);
 
     const handleToggleLike = async (trackId: number) => {
-        try {
-            const response = await fetch(`http://127.0.0.1:8000/api/tracks/${trackId}/like`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
+        const token = localStorage.getItem('token');
+        if (!token) {
+            Swal.fire({
+                title: 'Giriş Gerekli',
+                text: 'Şarkıları beğenmek için giriş yapmalısınız.',
+                icon: 'info',
+                showCancelButton: true,
+                confirmButtonText: 'Giriş Yap',
+                cancelButtonText: 'İptal',
+                background: '#161616',
+                color: '#fff',
+                confirmButtonColor: '#FF6B00',
+                cancelButtonColor: '#333',
+                customClass: {
+                    popup: 'rounded-[24px]',
+                    confirmButton: 'rounded-full px-6 py-2',
+                    cancelButton: 'rounded-full px-6 py-2'
                 }
+            }).then((result) => {
+                if (result.isConfirmed) { navigate('/login'); }
             });
+            return;
+        }
+        try {
+            const response = await apiFetch(`/api/tracks/${trackId}/like`, { method: 'POST' });
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.dispatchEvent(new Event('storage'));
+                Swal.fire({
+                    title: 'Giriş Gerekli',
+                    text: 'Şarkıları beğenmek için giriş yapmalısınız.',
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonText: 'Giriş Yap',
+                    cancelButtonText: 'İptal',
+                    background: '#161616',
+                    color: '#fff',
+                    confirmButtonColor: '#FF6B00',
+                    cancelButtonColor: '#333',
+                    customClass: {
+                        popup: 'rounded-[24px]',
+                        confirmButton: 'rounded-full px-6 py-2',
+                        cancelButton: 'rounded-full px-6 py-2'
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) { navigate('/login'); }
+                });
+                return;
+            }
             const data = await response.json();
-
             if (data.status === 'success') {
-                // Optimistic Update
                 setTracks(prev => prev.map(t =>
                     t.id === trackId ? { ...t, is_liked: data.liked, likes_count: data.total_likes } : t
                 ));
@@ -273,24 +252,6 @@ const Hub = () => {
 
 
 
-    const handleMenuClick = (e: React.MouseEvent, track: any) => {
-        e.stopPropagation();
-        const rect = e.currentTarget.getBoundingClientRect();
-        const menuWidth = 224;
-        const menuHeight = 190;
-
-        const isOnRightHalf = rect.left > window.innerWidth / 2;
-        const isOnBottomHalf = rect.top > window.innerHeight * 0.6;
-
-        setActiveMenu(activeMenu?.id === track.id ? null : {
-            id: track.id,
-            x: isOnRightHalf ? (rect.right - menuWidth) : rect.left,
-            y: isOnBottomHalf ? (rect.top - menuHeight - 8) : (rect.bottom + 8),
-            opensUp: isOnBottomHalf,
-            opensLeft: isOnRightHalf
-        });
-    };
-
     const handleArtistClick = (slug: string) => {
         navigate(`/artist/${slug}`);
     };
@@ -315,6 +276,8 @@ const Hub = () => {
             <div className="px-6 md:px-12 py-10 space-y-16">
 
                 {/* Featured Artists Section */}
+                {/* Featured Artists Section - Hidden as per user request (single artist looks bad) */}
+                {/* 
                 <section>
                     <div className="flex items-center gap-4 mb-8">
                         <div className="h-8 w-1 bg-[var(--accent)] rounded-full" />
@@ -327,7 +290,7 @@ const Hub = () => {
                         {artists.map((artist) => (
                             <div
                                 key={artist.id}
-                                onClick={() => navigate(`/artist/${artist.slug}`)}
+                                onClick={() => navigate(`/artist/${artist.slug || artist.id}`)}
                                 className="flex flex-col items-center gap-3 cursor-pointer group flex-shrink-0"
                             >
                                 <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-transparent group-hover:border-[var(--accent)] transition-all shadow-lg group-hover:shadow-[var(--accent)]/20">
@@ -344,6 +307,7 @@ const Hub = () => {
                         ))}
                     </div >
                 </section >
+                */}
 
                 {sections.map((section, idx) => (
                     <SectionCarousel
@@ -372,6 +336,7 @@ const Hub = () => {
 
                 return (
                     <div
+                        data-context-menu="true"
                         className="fixed z-[9999] w-56 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
                         style={{
                             top: activeMenu.y,
@@ -388,7 +353,7 @@ const Hub = () => {
                             }}
                         >
                             <Heart size={16} className={track.is_liked ? "text-red-500 fill-current" : ""} />
-                            {track.is_liked ? "Remove from Queue" : "Like Song"}
+                            {track.is_liked ? "Liked" : "Like Song"}
                         </button>
                         <button
                             className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-3 transition-colors"
@@ -403,8 +368,12 @@ const Hub = () => {
                         <button
                             className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-3 transition-colors"
                             onClick={() => {
-                                if (track.artist?.slug) {
-                                    handleArtistClick(track.artist.slug);
+                                if (track.artist?.slug || track.artist?.id) {
+                                    handleArtistClick(track.artist.slug || track.artist.id);
+                                } else if (track.user?.username && track.user?.role === 'artist') {
+                                    navigate(`/artist/${track.user.username}`);
+                                } else if (track.featured_artist) {
+                                    navigate(`/search?q=${encodeURIComponent(track.featured_artist)}`);
                                 }
                                 setActiveMenu(null);
                             }}
@@ -415,7 +384,17 @@ const Hub = () => {
                         <button
                             className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-3 transition-colors border-t border-white/5"
                             onClick={() => {
-                                // Share logic
+                                const shareUrl = `${window.location.origin}/track/${track.id}`;
+                                navigator.clipboard.writeText(shareUrl);
+                                const Toast = Swal.mixin({
+                                    toast: true,
+                                    position: 'top-end',
+                                    showConfirmButton: false,
+                                    timer: 2000,
+                                    background: '#1a1a1a',
+                                    color: '#fff'
+                                });
+                                Toast.fire({ icon: 'success', title: 'Link copied to clipboard' });
                                 setActiveMenu(null);
                             }}
                         >

@@ -18,6 +18,9 @@ class PlaylistController extends Controller
         }
 
         $playlists = $user->playlists()
+            ->with(['tracks' => function($query) {
+                $query->take(4); // Optimize: only need first 4 for cover
+            }])
             ->withCount('tracks')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -153,6 +156,23 @@ class PlaylistController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Track removed from playlist'
+        ]);
+    }
+
+    // Delete Playlist
+    public function destroy(Request $request, $id)
+    {
+        $playlist = $request->user()->playlists()->find($id);
+
+        if (!$playlist) {
+            return response()->json(['status' => 'error', 'message' => 'Playlist not found or access denied'], 404);
+        }
+
+        $playlist->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Playlist deleted successfully'
         ]);
     }
 }

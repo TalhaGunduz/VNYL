@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Track;
+use App\Models\TrackDailyStat;
+use App\Models\TrackAnalysis;
+use Carbon\Carbon;
 
 class TrackController extends Controller
 {
@@ -68,9 +72,22 @@ class TrackController extends Controller
     {
         $tracks = \App\Models\Track::where('user_id', $id)
             ->where('is_public', true)
-            ->where('is_public', true)
+            ->with(['analysis', 'artist', 'user'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'tracks' => $tracks
+        ]);
+    }
+
+    public function publicIndex(Request $request)
+    {
+        $tracks = \App\Models\Track::where('is_public', true)
             ->with(['analysis', 'artist'])
             ->orderBy('created_at', 'desc')
+            ->take(50) // Limit to 50 for performance
             ->get();
 
         return response()->json([
@@ -105,7 +122,6 @@ class TrackController extends Controller
         
         // Fetch random public tracks. Prefer ones with covers.
         $tracks = \App\Models\Track::where('is_public', true)
-        $tracks = \App\Models\Track::where('is_public', true)
                     ->with(['analysis', 'artist'])
                     ->inRandomOrder()
                     ->take($limit)
@@ -124,6 +140,7 @@ class TrackController extends Controller
             'title' => 'required|string|max:255',
             'genre' => 'required|string',
             'featured_artist' => 'nullable|string',
+            'description' => 'nullable|string',
             'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'analysis' => 'required|array' // Pass the analysis data back to save it
         ]);
@@ -156,11 +173,14 @@ class TrackController extends Controller
             $coverPath = $request->hasFile('cover') ? $request->file('cover')->store('covers', 'public') : null;
 
             $user = $request->user();
-            $userId = $user ? $user->id : 1; 
+            if (!$user) {
+                return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
+            }
+            $userId = $user->id;
 
             // Artist Logic
             $artistId = null;
-            if ($user && $user->artist) {
+            if ($user->artist) {
                 $artistId = $user->artist->id;
             }
 
@@ -171,6 +191,7 @@ class TrackController extends Controller
                 'file_path' => $newFilename,
                 'cover_path' => $coverPath,
                 'featured_artist' => $request->input('featured_artist'),
+                'description' => $request->input('description'),
                 'status' => 'published', // User clicked publish
                 'is_public' => true // Ensure visibility
             ]);
@@ -279,8 +300,15 @@ class TrackController extends Controller
             $title = trim($parts[1]);
         }
 
+        $user = $request->user();
+        $artistId = null;
+        if ($user && $user->artist) {
+            $artistId = $user->artist->id;
+        }
+
         $track = \App\Models\Track::create([
-            'user_id' => $request->user() ? $request->user()->id : 1, // Fallback for dev
+            'user_id' => $user ? $user->id : 1, // Fallback for dev
+            'artist_id' => $artistId,
             'title' => $title,
             'featured_artist' => $artist, // Storing "Artist" in featured_artist for now based on Prompt 3 mapping
                                          // Prompt 3 asked for "artist" field, but our DB has "featured_artist" or relies on User relationships.
@@ -296,6 +324,90 @@ class TrackController extends Controller
         return response()->json([
             'status' => 'success',
             'track' => $track
+        ]);
+    }
+    public function incrementPlay($id)
+    {
+        $track = Track::findOrFail($id);
+        $track->increment('plays');
+
+        // Increment Daily Stats using user's timezone context
+        $today = Carbon::today('Europe/Istanbul')->toDateString();
+
+        TrackDailyStat::firstOrCreate(
+            ['track_id' => $track->id, 'date' => $today]
+        )->increment('plays');
+
+        return response()->json(['status' => 'success', 'plays' => $track->plays]);
+    }
+
+    public function getTrackStats($id)
+    {
+        $track = Track::with('artist')->findOrFail($id);
+        
+        // Security check: only track owner or artist can see stats
+        // if ($track->user_id !== auth()->id() && $track->artist->user_id !== auth()->id()) {
+        //     return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 403);
+        // }
+
+        // Last 7 days daily plays (using user's timezone context)
+        $now = Carbon::now('Europe/Istanbul');
+        
+        $rawStats = TrackDailyStat::where('track_id', $id)
+            ->where('date', '>=', (clone $now)->subDays(6)->toDateString())
+            ->get(['date', 'plays'])
+            ->keyBy('date');
+
+        $dailyStats = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = (clone $now)->subDays($i)->toDateString();
+            $dailyStats[] = [
+                'date' => $date,
+                'plays' => isset($rawStats[$date]) ? (int)$rawStats[$date]->plays : 0
+            ];
+        }
+
+        // Calculate growth
+        $today = $now->toDateString();
+        $yesterday = (clone $now)->subDays(1)->toDateString();
+        
+        $playsToday = TrackDailyStat::where('track_id', $id)->where('date', $today)->value('plays') ?? 0;
+        $playsYesterday = TrackDailyStat::where('track_id', $id)->where('date', $yesterday)->value('plays') ?? 0;
+        
+        $growth = 0;
+        if ($playsYesterday > 0) {
+            $growth = (($playsToday - $playsYesterday) / $playsYesterday) * 100;
+        } elseif ($playsToday > 0) {
+            $growth = 100;
+        }
+
+        $monthlyPlays = TrackDailyStat::where('track_id', $id)
+            ->where('date', '>=', (clone $now)->subDays(6)->toDateString())
+            ->sum('plays');
+
+        $peakDay = TrackDailyStat::where('track_id', $id)
+            ->orderBy('plays', 'desc')
+            ->first(['date', 'plays']);
+
+        $playlistCount = \Illuminate\Support\Facades\DB::table('playlist_track')
+            ->where('track_id', $id)
+            ->count();
+
+        return response()->json([
+            'status' => 'success',
+            'track' => $track,
+            'stats' => [
+                'total_plays' => $track->plays,
+                'plays_today' => $playsToday,
+                'plays_yesterday' => $playsYesterday,
+                'growth' => round($growth, 1),
+                'monthly_plays' => (int)$monthlyPlays,
+                'peak_plays' => $peakDay ? (int)$peakDay->plays : 0,
+                'peak_date' => $peakDay ? $peakDay->date : null,
+                'daily_history' => $dailyStats,
+                'likes' => $track->likes_count,
+                'playlist_additions' => $playlistCount
+            ]
         ]);
     }
 }

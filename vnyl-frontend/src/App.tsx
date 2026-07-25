@@ -13,6 +13,7 @@ import ArtistPanel from './pages/ArtistPanel';
 import ArtistProfileSetup from './pages/ArtistProfileSetup';
 import Hub from './pages/Hub';
 import ArtistPage from './pages/ArtistPage';
+import TrackAnalytics from './pages/TrackAnalytics';
 
 import { PlayerProvider } from './context/PlayerContext';
 import MusicPlayer from './components/MusicPlayer';
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/artist/complete-profile" element={<ArtistProfileSetup />} />
           <Route path="/hub" element={<Hub />} />
           <Route path="/artist/:slug" element={<ArtistPage />} />
+          <Route path="/artist/analytics/:trackId" element={<TrackAnalytics />} />
         </Routes>
         <MusicPlayer />
       </PlayerProvider>

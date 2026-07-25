@@ -19,7 +19,7 @@ Route::post('/login', [\App\Http\Controllers\AuthController::class, 'login'])->n
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
-        return $request->user();
+        return $request->user()->load('artist');
     });
 
     Route::post('/logout', [\App\Http\Controllers\AuthController::class, 'logout']);
@@ -41,6 +41,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('playlists', PlaylistController::class);
     Route::post('/playlists/{id}/tracks', [PlaylistController::class, 'addTrack']);
     Route::delete('/playlists/{id}/tracks', [PlaylistController::class, 'removeTrack']);
+
+    // Follow System
+    Route::post('/users/{id}/follow', [\App\Http\Controllers\UserController::class, 'follow']);
+    Route::delete('/users/{id}/follow', [\App\Http\Controllers\UserController::class, 'unfollow']);
+    Route::get('/users/{id}/is-following', [\App\Http\Controllers\UserController::class, 'checkFollowStatus']);
+    Route::get('/me/following', [\App\Http\Controllers\UserController::class, 'following']);
 });
 
 // Public Track Routes
@@ -48,8 +54,11 @@ Route::get('/public-tracks', [\App\Http\Controllers\TrackController::class, 'pub
 Route::get('/users/{id}/tracks', [\App\Http\Controllers\TrackController::class, 'userTracks']);
 Route::get('/search', [\App\Http\Controllers\TrackController::class, 'search']); // DB Search
 Route::get('/tracks/random', [\App\Http\Controllers\TrackController::class, 'random']); 
+Route::post('/tracks/{id}/play', [\App\Http\Controllers\TrackController::class, 'incrementPlay']); 
 Route::get('/hub', [\App\Http\Controllers\HubController::class, 'index']); // New Curated Hub Logic
 Route::get('/global-search', [\App\Http\Controllers\SearchController::class, 'index']); // Instant Search
+Route::get('/tracks/stream/{filename}', [\App\Http\Controllers\AudioServiceController::class, 'streamAudio'])->where('filename', '.*'); // Stream Audio for Safari
+Route::get('/proxy/audio', [\App\Http\Controllers\AudioServiceController::class, 'proxyAudio']); // Stream Audio bypassing CORS
 
 // Artist Flow (Public/Semi-public but checks auth manually? No, should be guarded)
 // actually, verify-code might be clicked from email without login? 
@@ -60,7 +69,8 @@ Route::post('/auth/send-verification', [\App\Http\Controllers\ArtistController::
 Route::post('/auth/verify-code', [\App\Http\Controllers\ArtistController::class, 'verifyCode'])->middleware('auth:sanctum');
 Route::post('/artist/verify-and-upgrade', [\App\Http\Controllers\ArtistController::class, 'verifyAndUpgrade'])->middleware('auth:sanctum');
 Route::match(['put', 'post'], '/artist/profile', [\App\Http\Controllers\ArtistController::class, 'updateProfile'])->middleware('auth:sanctum');
-Route::get('/artist/stats', [\App\Http\Controllers\ArtistController::class, 'getStats']); // Stats public? Maybe not.
+Route::get('/artist/stats', [\App\Http\Controllers\ArtistController::class, 'getStats'])->middleware('auth:sanctum');
+Route::get('/artist/activity', [\App\Http\Controllers\ArtistController::class, 'getRecentActivity'])->middleware('auth:sanctum');
 
 
 // Public Artist Directory (Hub & Artist Page)
@@ -79,15 +89,17 @@ Route::middleware(['web'])->group(function () {
 
 
 Route::post('/analyze', [TrackController::class, 'analyze']);
-Route::post('/publish', [TrackController::class, 'publish']);
-
 Route::middleware(['auth:sanctum'])->group(function () {
+    Route::post('/publish', [TrackController::class, 'publish']);
     Route::put('/tracks/{id}', [TrackController::class, 'update']);
     Route::delete('/tracks/{id}', [TrackController::class, 'destroy']);
     
     // Like System
     Route::post('/tracks/{id}/like', [LikeController::class, 'toggleLike']);
     Route::get('/my-likes', [LikeController::class, 'myLikes']);
+
+    // Track Stats
+    Route::get('/tracks/{id}/stats', [TrackController::class, 'getTrackStats']);
 
     // Playlists
     Route::get('/playlists', [PlaylistController::class, 'index']); // List my playlists
